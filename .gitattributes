@@ -1,0 +1,6 @@
+docs/packaging-bom/contracts/**/*.json text eol=lf
+docs/packaging-bom/contracts/**/*.jsonl text eol=lf
+docs/packaging-bom/contracts/**/*.md text eol=lf
+docs/packaging-bom/contracts/**/*.sql text eol=lf
+modules/module-packaging-bom/module-packaging-bom-autoconfig/src/main/resources/db/module-packaging-bom/*.sql text eol=lf
+modules/module-packaging-bom/module-packaging-bom-migration-tool/src/test/resources/fixtures/** -text

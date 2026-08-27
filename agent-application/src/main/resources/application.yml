@@ -1,0 +1,148 @@
+server:
+  port: 9900
+
+spring:
+  datasource:
+    url: jdbc:sqlite:./data/agent_runner.db
+    driver-class-name: org.sqlite.JDBC
+  servlet:
+    multipart:
+      max-file-size: 200MB
+      max-request-size: 200MB
+
+framework:
+  api-registry:
+    enabled: true
+    initialize-schema: true
+    data-source-bean-name: dataSource
+    version: 1.0.0
+  storage:
+    rocksdb:
+      enabled: true
+      path: data/rocksdb
+
+mybatis-plus:
+  mapper-locations: classpath*:mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+sa-token:
+  token-name: Authorization
+  timeout: 86400
+  active-timeout: -1
+  is-concurrent: true
+  is-share: true
+  token-style: uuid
+
+feishu:
+  enabled: true
+  app-id: ${FEISHU_APP_ID:cli_aaa39b03b7b89cdc}
+  app-secret: ${FEISHU_APP_SECRET}
+  verification-token: ${FEISHU_VERIFICATION_TOKEN}
+  encrypt-key: ${FEISHU_ENCRYPT_KEY:change-me-feishu-encrypt-key}
+  agent:
+    ai-channel:
+      enabled: true
+    gateway:
+      archive-enabled: true
+      archive-app-token: ${FEISHU_ARCHIVE_APP_TOKEN}
+      archive-table-id: ${FEISHU_ARCHIVE_TABLE_ID:}
+
+ai:
+  agent:
+    enabled: true
+    name: ai-agent
+    model-name: qwen3.7-max
+    model-type: dashscope_chat
+    base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
+    api-key: ${AI_API_KEY}
+    temperature: 0.7
+    max-tokens: 2000
+    max-iters: 5
+    chat-history-limit: 20
+    conversation-max-sessions: 512
+    # conversation-shared-store: false  # true=会话记忆走 RocksDB 多实例共享
+    memory-enabled: true
+    memory-flush-trigger-seconds: 600
+    memory-consolidation-min-gap-minutes: 120
+    memory-consolidation-max-tokens: 4000
+    memory-daily-retention-days: 90
+    memory-session-retention-days: 180
+    memory-user-retention-days: 180
+    memory-max-records-per-category: 200
+
+plugin:
+  feishu:
+    datasource:
+      url: ${spring.datasource.url}
+      driver-class-name: ${spring.datasource.driver-class-name}
+  sys:
+    enabled: true
+  ai:
+    enabled: true
+  intent:
+    enabled: true
+    rules-location: file:data/intent-rules.json
+    # 置信度参数（命中 1 词达基准，每多命中 +step，实体命中 +entity，封顶 max）
+    base-confidence: 0.8
+    step-confidence: 0.06
+    entity-confidence: 0.06
+    max-confidence: 0.99
+    default-confidence: 0.8
+    # 业务意图匹配时跳过的兜底意图
+    skip-intents: PARAM_CLARIFY,GENERAL_CHAT,UNSUPPORTED,RISK_REJECT
+    # 导出强信号：命中任一动词即优先判定导出意图
+    export-intent-code: DATA_EXPORT
+    export-strong-signal: 导出,下载,发我份,导出来,拉个表,保存表格,生成报表
+    # 实体词表（槽位小写key -> 逗号分隔词表，支持 词=值 映射），留空使用内置默认词表
+    entity-words:
+      datatype: 订单,产量,良率,设备,库存,工单,质量,报表,客户
+      timerange: 本周,本月,上周,上月,今天,今日,昨天,今年,近7天,近30天
+      exportformat: excel,xlsx,xls,csv,pdf
+      ordertype: 采购单,生产单,订单,领料单,入库单,出库单,质检单
+      operationtype: 撤销,作废=撤销,提交,修改,编辑=修改,新增,创建=新增,新建=新增
+      topic: 请假,报销,审批,入职,离职,采购,退货,开票,盘点,排班,加班,调休
+    # 混合架构 LLM 层（真实模型接入；关闭则纯规则引擎）
+    llm-enabled: false
+    llm-parser-class: com.zimo.intent.parser.HttpIntentLlmParser
+    llm-base-url: ""
+    llm-api-key: ${LLM_API_KEY}
+    llm-model: qwen-plus
+    llm-timeout-ms: 30000
+    # 三级置信度边界（默认 0.5~0.8 为模糊识别档）
+    ambiguous-low: 0.5
+    ambiguous-high: 0.8
+    history-window: 8
+    reference-words: 它,它呢,这个,那个,上面,刚才,刚说,上一条
+    # 固定结果置信度档位（风险拒绝/不支持/闲聊/缺参追问）
+    risk-confidence: 0.99
+    unsupported-confidence: 0.7
+    chat-confidence: 0.6
+    clarify-confidence: 0.85
+    # 单据号抽取正则（YAML 双引号内需双反斜杠）；置空不抽取 orderId
+    order-id-pattern: "\\d{6,}"
+    # 必填槽位豁免名单：名单内槽位缺失不触发追问
+    exempt-slots: timeRange
+  auth:
+    enabled: true
+
+logging:
+  level:
+    com.zimo: debug
+
+# ===== module-agent-memory 四层记忆（H2 OLTP + Arrow/Calcite OLAP，纯 Java 无 JNI）=====
+agent-memory:
+  h2-url: jdbc:h2:file:./data/agent-memory;MODE=LEGACY
+  olap-arrow-data-file: ./data/olap/l0_log.arrow
+  sync-cron: "0 */1 * * * ?"
+  whitelist-categories: ""
+  sensitive-filtering: true
+  oltp-engine: h2
+  olap-engine: arrow

@@ -1,0 +1,2 @@
+com.zimo.module.security.autoconfig.SecurityAutoConfiguration
+com.zimo.module.security.autoconfig.SecurityControllerScanAutoConfiguration

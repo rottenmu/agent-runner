@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>智能体记忆管理 — 前端页面原型</title>
+<link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css">
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script src="https://unpkg.com/element-plus/dist/index.full.min.js"></script>
+<script src="https://unpkg.com/echarts@5/dist/echarts.min.js"></script>
+<style>
+  :root {
+    --brand: #2b5bff; --brand-soft: #eef3ff;
+    --bg: #f5f7fa; --card: #ffffff; --border: #e4e7ed;
+    --text: #303133; --text-2: #606266; --text-3: #909399;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--text); }
+  .layout { display: flex; min-height: 100vh; }
+  /* 侧边栏 */
+  .sidebar { width: 208px; background: #fff; border-right: 1px solid var(--border); padding: 16px 12px; flex-shrink: 0; }
+  .brand { display: flex; align-items: center; gap: 8px; padding: 4px 8px 16px; font-weight: 600; font-size: 15px; }
+  .brand .dot { width: 26px; height: 26px; border-radius: 7px; background: linear-gradient(135deg,#2b5bff,#7a5cff); display:flex; align-items:center; justify-content:center; color:#fff; font-size:14px; }
+  .menu-item { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-radius: 8px; cursor: pointer; font-size: 13.5px; color: var(--text-2); margin-bottom: 2px; }
+  .menu-item:hover { background: #f5f7fa; }
+  .menu-item.active { background: var(--brand-soft); color: var(--brand); font-weight: 600; }
+  .menu-item .mico { width: 16px; text-align: center; font-size: 14px; }
+  .menu-group { font-size: 12px; color: var(--text-3); padding: 10px 12px 6px; }
+  /* 主区 */
+  .main { flex: 1; padding: 20px 24px; min-width: 0; }
+  .page-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .page-head h1 { font-size: 18px; font-weight: 600; }
+  .page-head .sub { font-size: 12.5px; color: var(--text-3); margin-top: 4px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+  .card-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; }
+  /* 指标卡 */
+  .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 16px; }
+  .kpi { background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .kpi .label { font-size: 12.5px; color: var(--text-3); }
+  .kpi .value { font-size: 24px; font-weight: 700; margin-top: 6px; }
+  .kpi .value small { font-size: 12px; color: var(--text-3); font-weight: 400; margin-left: 2px; }
+  .kpi .trend { font-size: 12px; color: #2a9d6f; margin-top: 4px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-2-3 { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
+  .chart-box { height: 240px; }
+  /* 表格/标签 */
+  .tag { display: inline-block; padding: 2px 9px; border-radius: 10px; font-size: 12px; }
+  .tag-preference { background: #f0f7ff; color: #2b5bff; }
+  .tag-persona { background: #f5f0ff; color: #7a5cff; }
+  .tag-history { background: #fff5f0; color: #e67c3c; }
+  .tag-custom { background: #f0f9f3; color: #2a9d6f; }
+  .tag-global { background: #fff7e8; color: #c98a00; }
+  .masked { display: inline-block; padding: 1px 6px; border-radius: 4px; background: #fdecec; color: #d9534f; font-size: 11px; margin-left: 6px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: var(--text-3); font-weight: 500; padding: 8px 10px; border-bottom: 1px solid var(--border); background: #fafbfc; }
+  td { padding: 9px 10px; border-bottom: 1px solid #f0f2f5; color: var(--text); }
+  tr:hover td { background: #fafbff; }
+  .btn { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--border); background: #fff; border-radius: 6px; padding: 5px 12px; font-size: 12.5px; cursor: pointer; color: var(--text-2); }
+  .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .btn.danger { color: #d9534f; border-color: #f0c4c3; }
+  .btn:hover { opacity: .88; }
+  .search { display: flex; gap: 10px; margin-bottom: 14px; align-items: center; }
+  .input { border: 1px solid var(--border); border-radius: 6px; padding: 7px 11px; font-size: 13px; width: 240px; outline: none; }
+  .input:focus { border-color: var(--brand); }
+  .select { border: 1px solid var(--border); border-radius: 6px; padding: 7px 10px; font-size: 13px; background: #fff; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 14px; }
+  .tab { padding: 5px 14px; border-radius: 14px; font-size: 12.5px; cursor: pointer; color: var(--text-2); background: #f0f2f5; }
+  .tab.active { background: var(--brand); color: #fff; }
+  .pagination { display: flex; justify-content: flex-end; gap: 6px; margin-top: 12px; font-size: 12.5px; color: var(--text-3); align-items: center; }
+  .pag-btn { border: 1px solid var(--border); background: #fff; border-radius: 5px; padding: 3px 9px; cursor: pointer; }
+  /* 时间线 */
+  .timeline { position: relative; padding-left: 20px; }
+  .tl-item { position: relative; padding: 0 0 18px 14px; border-left: 2px solid #e4e7ed; }
+  .tl-item:last-child { border-left-color: transparent; }
+  .tl-item .node { position: absolute; left: -6px; top: 0; width: 10px; height: 10px; border-radius: 50%; border: 2px solid #fff; }
+  .node-user { background: #2b5bff; } .node-assistant { background: #2a9d6f; } .node-tool { background: #e67c3c; } .node-system { background: #909399; }
+  .tl-item .role { font-size: 12px; font-weight: 600; color: var(--text-2); }
+  .tl-item .time { font-size: 11.5px; color: var(--text-3); margin-left: 8px; }
+  .tl-item .content { font-size: 13px; margin-top: 4px; background: #fafbfc; border-radius: 6px; padding: 8px 10px; }
+  /* 策略 */
+  .policy-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f0f2f5; font-size: 13px; }
+  .switch { width: 36px; height: 20px; border-radius: 10px; background: #c0c4cc; position: relative; cursor: pointer; }
+  .switch.on { background: var(--brand); }
+  .switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: .2s; }
+  .switch.on::after { left: 18px; }
+  .chip { display: inline-block; padding: 3px 10px; border-radius: 12px; background: #f0f2f5; font-size: 12px; margin: 3px 4px 3px 0; }
+  .hint { font-size: 12px; color: var(--text-3); }
+  .sync-tag { font-size: 12px; color: var(--text-3); background: #f0f2f5; padding: 4px 10px; border-radius: 12px; }
+  @media (max-width: 1100px) { .grid-2, .grid-2-3, .kpi-row { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div id="app" v-cloak>
+  <div class="layout">
+    <!-- 侧边栏 -->
+    <aside class="sidebar">
+      <div class="brand"><span class="dot">记</span>智能体记忆</div>
+      <div class="menu-group">记忆管理</div>
+      <div v-for="m in menus" :key="m.key" class="menu-item" :class="{active: page===m.key}" @click="page=m.key">
+        <span class="mico">{{m.ico}}</span>{{m.label}}
+      </div>
+      <div class="menu-group">系统</div>
+      <div class="menu-item" @click="page='policy'"><span class="mico">⚙</span>记忆策略</div>
+    </aside>
+    <!-- 主区 -->
+    <main class="main">
+      <!-- ============ 1. 记忆总览 ============ -->
+      <template v-if="page==='dashboard'">
+        <div class="page-head">
+          <div><h1>记忆总览</h1><div class="sub">OLAP 离线分析报表 · 数据由 ETL 每分钟增量同步</div></div>
+          <span class="sync-tag">⏱ 最近同步：12:33:05</span>
+        </div>
+        <div class="kpi-row">
+          <div class="kpi"><div class="label">会话数</div><div class="value">128<small>个</small></div><div class="trend">▲ 12% 较上周</div></div>
+          <div class="kpi"><div class="label">消息总量</div><div class="value">3,482<small>条</small></div><div class="trend">▲ 8.4%</div></div>
+          <div class="kpi"><div class="label">Token 消耗</div><div class="value">562k<small>tokens</small></div><div class="trend">▲ 15.2%</div></div>
+          <div class="kpi"><div class="label">L0 事件量</div><div class="value">4,120<small>条</small></div><div class="trend">蒸馏事件 87 条</div></div>
+        </div>
+        <div class="grid-2-3">
+          <div class="card">
+            <div class="card-title">用户行为时序（近 7 天）</div>
+            <div class="chart-box" id="chartActivity"></div>
+          </div>
+          <div class="card">
+            <div class="card-title">L0 事件构成</div>
+            <div class="chart-box" id="chartDistill"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">会话活跃排行<span class="hint">按 Token 消耗 Top 10</span></div>
+          <table>
+            <tr><th>会话 ID</th><th>消息数</th><th>Token 消耗</th><th>活跃时长</th></tr>
+            <tr v-for="s in sessionStats" :key="s.id">
+              <td>{{s.id}}</td><td>{{s.msgs}}</td><td>{{s.tokens}}</td><td>{{s.dur}}</td>
+            </tr>
+          </table>
+        </div>
+      </template>
+
+      <!-- ============ 2. 用户记忆 ============ -->
+      <template v-else-if="page==='user'">
+        <div class="page-head"><div><h1>用户长期记忆</h1><div class="sub">L3 画像 + L1 原子记忆 · 会话启动优先加载画像（Caffeine）</div></div></div>
+        <div class="card">
+          <div class="search">
+            <input class="input" v-model="userQuery" placeholder="输入用户 ID，如 admin / zhangsan">
+            <button class="btn primary" @click="userQuery=userQuery">查询</button>
+            <button class="btn" @click="showUserAdd=true">+ 新增记忆</button>
+            <button class="btn danger" @click="clearUser">清空该用户全部记忆</button>
+          </div>
+          <div class="tabs">
+            <span v-for="c in userCats" :key="c" class="tab" :class="{active:userCat===c}" @click="userCat=c">{{c}}</span>
+          </div>
+          <table>
+            <tr><th style="width:90px">类别</th><th>记忆内容</th><th style="width:150px">更新时间</th><th style="width:110px">操作</th></tr>
+            <tr v-for="m in userMemories" :key="m.id">
+              <td><span class="tag" :class="'tag-'+m.cat">{{m.catLabel}}</span></td>
+              <td>{{m.content}}<span v-if="m.masked" class="masked">已脱敏</span></td>
+              <td>{{m.ts}}</td>
+              <td><button class="btn" @click="traceId=m.traceId;page='trace'">溯源</button><button class="btn danger" @click="delOne(m)">删除</button></td>
+            </tr>
+          </table>
+          <div class="pagination"><span>共 23 条</span><span class="pag-btn">‹</span><span class="pag-btn">1</span><span class="pag-btn">2</span><span class="pag-btn">3</span><span class="pag-btn">›</span></div>
+        </div>
+        <!-- 新增弹窗 -->
+        <div v-if="showUserAdd" style="position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;z-index:50">
+          <div style="background:#fff;border-radius:10px;padding:20px;width:440px">
+            <div style="font-weight:600;margin-bottom:14px">新增用户记忆</div>
+            <div style="display:grid;gap:10px">
+              <input class="input" style="width:100%" v-model="userQuery" placeholder="用户 ID">
+              <select class="select" style="width:100%" v-model="userCat">
+                <option v-for="c in ['persona','preference','history','custom']" :key="c">{{c}}</option>
+              </select>
+              <textarea class="input" style="width:100%;height:90px;resize:none" placeholder="记忆内容（敏感信息将自动脱敏）"></textarea>
+            </div>
+            <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px">
+              <button class="btn" @click="showUserAdd=false">取消</button>
+              <button class="btn primary" @click="showUserAdd=false">保存</button>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <!-- ============ 3. 会话记忆 ============ -->
+      <template v-else-if="page==='session'">
+        <div class="page-head"><div><h1>会话记忆</h1><div class="sub">L1 会话变量 · 按会话 ID 查询（GET /api/ai/memory/session/{sessionId}）</div></div></div>
+        <div class="card">
+          <div class="search">
+            <input class="input" v-model="sessionId" placeholder="会话 ID，如 s-20260819-001">
+            <button class="btn primary">查询</button>
+            <button class="btn">+ 新增变量</button>
+          </div>
+          <table>
+            <tr><th style="width:220px">变量名（key）</th><th>值（value）</th><th style="width:150px">时间</th><th style="width:90px">操作</th></tr>
+            <tr v-for="v in sessionVars" :key="v.k">
+              <td>{{v.k}}</td><td>{{v.v}}</td><td>{{v.ts}}</td><td><button class="btn danger">删除</button></td>
+            </tr>
+          </table>
+          <div v-if="!sessionId" class="hint" style="padding:18px 0;text-align:center">输入会话 ID 查看该会话的业务变量</div>
+        </div>
+      </template>
+
+      <!-- ============ 4. 全局记忆 ============ -->
+      <template v-else-if="page==='global'">
+        <div class="page-head"><div><h1>全局持久记忆</h1><div class="sub">跨会话共享 · POST/DELETE /api/ai/memory/global</div></div></div>
+        <div class="card">
+          <div class="search">
+            <button class="btn primary">+ 新增全局记忆</button>
+            <button class="btn danger" @click="clearGlobal">清空全部</button>
+            <span class="hint">共 5 条 · 删除需二次确认</span>
+          </div>
+          <table>
+            <tr><th style="width:220px">记忆键（key）</th><th>内容</th><th style="width:150px">时间</th><th style="width:90px">操作</th></tr>
+            <tr v-for="g in globalVars" :key="g.k">
+              <td>{{g.k}}</td><td>{{g.v}}<span v-if="g.masked" class="masked">已脱敏</span></td><td>{{g.ts}}</td><td><button class="btn danger">删除</button></td>
+            </tr>
+          </table>
+        </div>
+      </template>
+
+      <!-- ============ 5. 溯源分析 ============ -->
+      <template v-else-if="page==='trace'">
+        <div class="page-head"><div><h1>溯源分析</h1><div class="sub">L0 原始日志 · traceId 反向定位完整事件链（GET /api/agent-memory/analytics/trace）</div></div></div>
+        <div class="card">
+          <div class="search">
+            <input class="input" v-model="traceId" placeholder="输入 traceId，如 trace-1751b03ab801">
+            <button class="btn primary" @click="doTrace">检索事件链</button>
+          </div>
+          <div v-if="traceEvents.length" class="timeline">
+            <div v-for="(e,i) in traceEvents" :key="i" class="tl-item">
+              <span class="node" :class="'node-'+e.role"></span>
+              <span class="role">{{e.roleLabel}}</span><span class="time">{{e.time}} · {{e.tokens}} tokens</span>
+              <div class="content">{{e.content}}</div>
+            </div>
+          </div>
+          <div v-else class="hint" style="padding:24px 0;text-align:center">输入 traceId 查看该次交互的 L0 原始事件链</div>
+        </div>
+      </template>
+
+      <!-- ============ 6. 记忆策略 ============ -->
+      <template v-else-if="page==='policy'">
+        <div class="page-head"><div><h1>记忆策略</h1><div class="sub">白名单与敏感过滤（GET /api/ai/memory/policy，只读）</div></div></div>
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-title">敏感内容过滤</div>
+            <div class="policy-row"><span>敏感过滤开关</span><span class="switch on"></span></div>
+            <div class="policy-row"><span>未在白名单的类别</span><span style="color:#d9534f">拒绝写入</span></div>
+            <div class="hint" style="margin-top:10px">脱敏规则（7 类）：</div>
+            <div style="margin-top:8px">
+              <span v-for="r in sensitiveRules" :key="r" class="chip">{{r}}</span>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">记忆类别白名单</div>
+            <div v-if="whitelistEnabled" style="margin-top:6px">
+              <span v-for="w in whitelist" :key="w" class="chip">{{w}}</span>
+            </div>
+            <div v-else class="hint" style="padding:12px 0">白名单未启用（放行全部类别：persona / preference / history / custom / global）</div>
+            <div style="margin-top:14px;border-top:1px solid #f0f2f5;padding-top:12px">
+              <div class="policy-row"><span>L3 画像缓存（Caffeine）</span><span class="hint">10,000 条 / 2 小时</span></div>
+              <div class="policy-row"><span>ETL 同步周期</span><span class="hint">每分钟（可配置 sync-cron）</span></div>
+            </div>
+          </div>
+        </div>
+      </template>
+    </main>
+  </div>
+</div>
+
+<script>
+const { createApp } = Vue;
+createApp({
+  data() {
+    return {
+      page: 'dashboard',
+      menus: [
+        {key:'dashboard', label:'记忆总览', ico:'📊'},
+        {key:'user',      label:'用户记忆', ico:'👤'},
+        {key:'session',   label:'会话记忆', ico:'💬'},
+        {key:'global',    label:'全局记忆', ico:'🌐'},
+        {key:'trace',     label:'溯源分析', ico:'🔍'},
+      ],
+      // 总览
+      sessionStats: [
+        {id:'s-20260819-001', msgs:86, tokens:'42,500', dur:'38 分钟'},
+        {id:'s-20260819-002', msgs:64, tokens:'38,200', dur:'31 分钟'},
+        {id:'s-20260818-017', msgs:52, tokens:'29,800', dur:'26 分钟'},
+        {id:'s-20260818-009', msgs:47, tokens:'24,100', dur:'22 分钟'},
+        {id:'s-20260818-003', msgs:38, tokens:'18,600', dur:'19 分钟'},
+      ],
+      // 用户记忆
+      userQuery: 'admin',
+      userCat: '全部',
+      userCats: ['全部','persona','preference','history','custom'],
+      showUserAdd: false,
+      userMemories: [
+        {id:'m1', cat:'persona', catLabel:'画像', content:'行政部员工，负责采购审批与供应商对接', ts:'2026-08-19 10:12', masked:false, traceId:'trace-aaa001'},
+        {id:'m2', cat:'preference', catLabel:'偏好', content:'偏好周报邮件，联系电话 138****5678', ts:'2026-08-19 09:41', masked:true, traceId:'trace-aaa002'},
+        {id:'m3', cat:'history', catLabel:'历史', content:'2026-08 完成供应商 A 的资质审核', ts:'2026-08-18 17:20', masked:false, traceId:'trace-aaa003'},
+        {id:'m4', cat:'custom', catLabel:'自定义', content:'对接人：张经理（业务方）', ts:'2026-08-18 15:02', masked:false, traceId:'trace-aaa004'},
+      ],
+      // 会话记忆
+      sessionId: '',
+      sessionVars: [
+        {k:'current_doc', v:'供应商资质审核表.docx', ts:'2026-08-19 10:30'},
+        {k:'approval_step', v:'第 2 步：财务复核', ts:'2026-08-19 10:31'},
+      ],
+      // 全局记忆
+      globalVars: [
+        {k:'week-rule', v:'周报每周五 17:00 发送', ts:'2026-08-19 11:02', masked:false},
+        {k:'ops-rule', v:'值班日报每晚 22:00', ts:'2026-08-19 11:05', masked:false},
+        {k:'api-endpoint', v:'sk-****abc123', ts:'2026-08-18 14:20', masked:true},
+      ],
+      // 溯源
+      traceId: '',
+      traceEvents: [
+        {role:'user', roleLabel:'用户', time:'2026-08-19 10:12:03', tokens:18, content:'帮我整理本周的采购审批进度'},
+        {role:'assistant', roleLabel:'智能体', time:'2026-08-19 10:12:04', tokens:42, content:'好的，正在读取审批记录并生成周报'},
+        {role:'tool', roleLabel:'工具调用', time:'2026-08-19 10:12:05', tokens:30, content:'memory_read(target=user, userId=admin)'},
+        {role:'assistant', roleLabel:'智能体', time:'2026-08-19 10:12:09', tokens:120, content:'本周已完成 3 项审批，其中供应商 A 已通过…'},
+      ],
+      // 策略
+      whitelistEnabled: false,
+      whitelist: [],
+      sensitiveRules: ['phone','id_card','bank_card','email','api_key','bearer_token','private_ip'],
+    };
+  },
+  methods: {
+    clearUser() { if (confirm('确认清空该用户全部记忆？（DELETE /user 无 id 参数）')) { this.userMemories = []; } },
+    clearGlobal() { if (confirm('确认清空全部全局记忆？')) { this.globalVars = []; } },
+    delOne(m) { this.userMemories = this.userMemories.filter(x => x.id !== m.id); },
+    doTrace() { /* 模拟：输入后填充事件链 */ },
+  },
+  mounted() {
+    // ECharts：用户行为时序
+    const act = echarts.init(document.getElementById('chartActivity'));
+    act.setOption({
+      grid: {left:36, right:16, top:20, bottom:26},
+      tooltip: {trigger:'axis'},
+      xAxis: {type:'category', data:['08-13','08-14','08-15','08-16','08-17','08-18','08-19'], axisLabel:{color:'#909399'}},
+      yAxis: {type:'value', splitLine:{lineStyle:{color:'#f0f2f5'}}},
+      series: [{type:'line', smooth:true, data:[86,120,98,145,132,178,96], lineStyle:{color:'#2b5bff', width:2.5},
+        itemStyle:{color:'#2b5bff'}, areaStyle:{color:'rgba(43,91,255,.08)'}}],
+    });
+    // ECharts：L0 事件构成
+    const dis = echarts.init(document.getElementById('chartDistill'));
+    dis.setOption({
+      tooltip: {trigger:'item'},
+      series: [{type:'pie', radius:['46%','70%'], center:['50%','52%'], data:[
+        {value:2050, name:'user', itemStyle:{color:'#2b5bff'}},
+        {value:1560, name:'assistant', itemStyle:{color:'#2a9d6f'}},
+        {value:380, name:'tool', itemStyle:{color:'#e67c3c'}},
+        {value:130, name:'system', itemStyle:{color:'#909399'}},
+      ], label:{color:'#606266', fontSize:12}, itemStyle:{borderColor:'#fff', borderWidth:2}}],
+    });
+    window.addEventListener('resize', () => { act.resize(); dis.resize(); });
+  },
+}).mount('#app');
+</script>
+</body>
+</html>

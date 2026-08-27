@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.zimo</groupId>
+        <artifactId>modules</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>agent-intent</artifactId>
+    <packaging>pom</packaging>
+    <name>module-intent</name>
+    <description>通用意图识别引擎：规则驱动 + 可配置化，供任意业务模块复用（对话路由/工具调用/拒绝拦截）</description>
+
+    <modules>
+        <module>agent-intent-core</module>
+        <module>agent-intent-autoconfig</module>
+    </modules>
+</project>

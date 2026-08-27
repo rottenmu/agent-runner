@@ -1,0 +1,13 @@
+ai:
+  agent:
+    enabled: true
+    name: ${AI_AGENT_NAME:ai-agent}
+    model-name: ${LLM_MODEL_NAME:qwen-plus}
+    model-type: ${LLM_MODEL_TYPE:dashscope_chat}
+    base-url: ${LLM_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/v1}
+    api-key: ${DASHSCOPE_API_KEY:sk-ws-H.RYIHMPM.vgP9.MEUCIQDs_Bo3q8lfVU3CTHOybpArXqZxE7OswBz8FfwDfqTz5AIgFlMy1iOJbIWUA_DcFfoUhRQMPzwT5taN2wqiIuyI-mc}
+    temperature: ${LLM_TEMPERATURE:0.7}
+    max-tokens: ${LLM_MAX_TOKENS:2000}
+    max-iters: ${AGENT_MAX_ITERS:5}
+    chat-history-limit: ${CHAT_HISTORY_LIMIT:20}
+    system-prompt: ${AI_AGENT_SYSTEM_PROMPT:}

@@ -1,0 +1,314 @@
+{
+  "version": "1.0.0",
+  "schema": "intent-rules-standard-v1",
+  "updatedAt": "2026-08-14",
+  "note": "预设意图枚举固定，可按业务场景扩展（编码全局唯一）；requiredSlots 缺失时强制 PARAM_CLARIFY；触发词兼容口语化/缩写/模糊表述",
+  "rules": [
+    {
+      "intentCode": "DATA_QUERY",
+      "intentName": "业务数据查询",
+      "intentDesc": "用户查询业务数据：报表、工单、生产批次、设备状态、产量、订单、库存、质量等数据；适用所有数据查看类诉求。",
+      "triggerKeywords": [
+        "查询",
+        "查一下",
+        "看看",
+        "看下",
+        "报表",
+        "数据",
+        "统计",
+        "汇总",
+        "明细",
+        "多少",
+        "工单",
+        "订单",
+        "产量",
+        "库存",
+        "设备状态",
+        "进度",
+        "趋势",
+        "排行",
+        "今天/本周/本月/上月 XX 是多少",
+        "帮我查 XX",
+        "XX 的单子有哪些",
+        "最近 XX 情况"
+      ],
+      "requiredSlots": [
+        {
+          "name": "dataType",
+          "label": "查询对象",
+          "desc": "查什么数据（订单/产量/工单/设备等）"
+        },
+        {
+          "name": "timeRange",
+          "label": "时间范围",
+          "desc": "默认当日/最近7天，缺失时按默认范围查询"
+        }
+      ],
+      "optionalSlots": [
+        {
+          "name": "filter",
+          "label": "筛选条件",
+          "desc": "状态/类型/负责人等过滤项"
+        },
+        {
+          "name": "dimension",
+          "label": "分组维度",
+          "desc": "按日/周/月/部门/产线分组"
+        }
+      ],
+      "supportTool": [
+        "report_query",
+        "order_query",
+        "production_board",
+        "inventory_query"
+      ],
+      "confidenceThreshold": 0.8,
+      "routeStrategy": "TOOL_CALL",
+      "rejectRule": "涉及其他租户/无权限范围数据、敏感经营数据（成本、毛利明细）查询一律拒绝；时间范围超过允许跨度（默认 365 天）需人工确认"
+    },
+    {
+      "intentCode": "DATA_EXPORT",
+      "intentName": "数据导出",
+      "intentDesc": "用户要求导出/下载报表或数据文件（Excel/CSV/PDF），区别于纯查看。",
+      "triggerKeywords": [
+        "导出",
+        "下载",
+        "保存表格",
+        "生成报表",
+        "拉个表",
+        "发我份",
+        "导出来",
+        "下载数据",
+        "把 XX 导成 excel",
+        "XX 报表下载",
+        "导出 XX 明细"
+      ],
+      "requiredSlots": [
+        {
+          "name": "dataType",
+          "label": "导出对象",
+          "desc": "导什么数据"
+        },
+        {
+          "name": "exportFormat",
+          "label": "导出格式",
+          "desc": "excel/csv/pdf，默认 excel"
+        }
+      ],
+      "optionalSlots": [
+        {
+          "name": "timeRange",
+          "label": "时间范围",
+          "desc": "导出数据的时间区间"
+        },
+        {
+          "name": "columns",
+          "label": "导出字段",
+          "desc": "指定列，缺省导出全部列"
+        }
+      ],
+      "supportTool": [
+        "export_service",
+        "report_generator"
+      ],
+      "confidenceThreshold": 0.8,
+      "routeStrategy": "TOOL_CALL",
+      "rejectRule": "单次导出行数超限（默认 10 万行）拒绝并提示分批；涉密/成本类数据导出需权限校验，无权限拒绝"
+    },
+    {
+      "intentCode": "ORDER_OPERATE",
+      "intentName": "单据操作",
+      "intentDesc": "用户对业务单据执行新增/修改/提交/撤销等写操作，涉及状态变更，需高置信度+二次确认。",
+      "triggerKeywords": [
+        "新增",
+        "创建",
+        "新建",
+        "修改",
+        "编辑",
+        "提交",
+        "撤销",
+        "作废",
+        "退回",
+        "加一张 XX 单",
+        "把 XX 单改一下",
+        "提交 XX",
+        "撤销 XX 单",
+        "补录 XX"
+      ],
+      "requiredSlots": [
+        {
+          "name": "operationType",
+          "label": "操作类型",
+          "desc": "新增/修改/提交/撤销"
+        },
+        {
+          "name": "orderType",
+          "label": "单据类型",
+          "desc": "采购单/生产单/订单/领料单等"
+        },
+        {
+          "name": "orderId",
+          "label": "单据标识",
+          "desc": "新增时可为空，修改/撤销必填"
+        }
+      ],
+      "optionalSlots": [
+        {
+          "name": "remark",
+          "label": "备注",
+          "desc": "操作备注"
+        },
+        {
+          "name": "itemData",
+          "label": "明细数据",
+          "desc": "新增时的单据明细"
+        }
+      ],
+      "supportTool": [
+        "order_service",
+        "production_order_service"
+      ],
+      "confidenceThreshold": 0.9,
+      "routeStrategy": "TOOL_CALL_WITH_CONFIRM",
+      "rejectRule": "无该单据操作权限拒绝；撤销/作废已审批、已过账单据拒绝；修改他人创建单据且无授权拒绝；破坏性操作（删除、清空）一律拒绝并提示走人工流程"
+    },
+    {
+      "intentCode": "FAQ_ANSWER",
+      "intentName": "业务知识问答",
+      "intentDesc": "咨询业务流程、制度规则、操作指引、系统功能说明等知识类问题，不产生数据变更。",
+      "triggerKeywords": [
+        "怎么",
+        "如何",
+        "流程",
+        "步骤",
+        "规定",
+        "规则",
+        "要求",
+        "制度",
+        "可以吗",
+        "怎么办",
+        "需要什么材料",
+        "多久",
+        "标准",
+        "说明",
+        "什么是"
+      ],
+      "requiredSlots": [
+        {
+          "name": "topic",
+          "label": "问题主题",
+          "desc": "咨询哪方面流程/规则"
+        }
+      ],
+      "optionalSlots": [],
+      "supportTool": [
+        "knowledge_base_retrieval",
+        "faq_service"
+      ],
+      "confidenceThreshold": 0.8,
+      "routeStrategy": "KB_RETRIEVAL",
+      "rejectRule": "问题涉及未公开制度/内部敏感流程时仅给公开口径；知识库无答案时不得编造，回退 UNSUPPORTED 或转人工"
+    },
+    {
+      "intentCode": "GENERAL_CHAT",
+      "intentName": "通用闲聊",
+      "intentDesc": "无业务诉求的日常对话：问候、感谢、寒暄、情绪表达、非业务话题。",
+      "triggerKeywords": [
+        "你好",
+        "hi",
+        "hello",
+        "谢谢",
+        "辛苦了",
+        "再见",
+        "好的",
+        "在吗",
+        "早上好",
+        "随便聊聊",
+        "你是",
+        "讲个笑话",
+        "今天天气"
+      ],
+      "requiredSlots": [],
+      "optionalSlots": [],
+      "supportTool": [],
+      "confidenceThreshold": 0.6,
+      "routeStrategy": "CHAT_REPLY",
+      "rejectRule": "闲聊中夹带业务诉求时优先识别业务意图；闲聊内容触发敏感词仍按 RISK_REJECT 处理"
+    },
+    {
+      "intentCode": "PARAM_CLARIFY",
+      "intentName": "参数澄清追问",
+      "intentDesc": "业务意图已识别但必填槽位缺失，系统主动追问补全，禁止直接执行业务。由路由层自动触发，不依赖用户直接表达。",
+      "triggerKeywords": [],
+      "requiredSlots": [],
+      "optionalSlots": [],
+      "supportTool": [],
+      "confidenceThreshold": 0.0,
+      "routeStrategy": "CLARIFY",
+      "rejectRule": "同一意图追问超过 3 轮仍缺失时转人工或放弃；追问话术必须明确列出缺失字段与示例格式"
+    },
+    {
+      "intentCode": "UNSUPPORTED",
+      "intentName": "超出能力范围",
+      "intentDesc": "用户诉求超出系统预设业务能力：不存在的功能、无法执行的操作、业务范围外需求。",
+      "triggerKeywords": [
+        "炒股",
+        "投资建议",
+        "算命",
+        "天气",
+        "新闻",
+        "游戏",
+        "写代码",
+        "翻译文章"
+      ],
+      "requiredSlots": [],
+      "optionalSlots": [],
+      "supportTool": [],
+      "confidenceThreshold": 0.7,
+      "routeStrategy": "FALLBACK",
+      "rejectRule": "能力外诉求不拒绝用户但明确说明不支持范围，可引导至人工客服"
+    },
+    {
+      "intentCode": "RISK_REJECT",
+      "intentName": "风险违规拒绝",
+      "intentDesc": "指令含违规、越权、敏感、非法内容：删除篡改数据、绕过权限、套现刷单、攻击系统、涉政涉黄涉暴、获取他人隐私等，直接拒绝且不执行任何操作。",
+      "triggerKeywords": [
+        "删除数据库",
+        "清空",
+        "绕过",
+        "越权",
+        "冒充",
+        "套现",
+        "刷单",
+        "作弊",
+        "篡改",
+        "攻击",
+        "破解",
+        "提现别人",
+        "查他人信息",
+        "删除记录",
+        "改分数",
+        "隐瞒",
+        "违规操作",
+        "删除",
+        "删掉",
+        "清掉",
+        "删库",
+        "改数据",
+        "提现",
+        "转账给",
+        "盗号",
+        "黑产",
+        "洗钱",
+        "裸聊",
+        "赌博"
+      ],
+      "requiredSlots": [],
+      "optionalSlots": [],
+      "supportTool": [],
+      "confidenceThreshold": 0.75,
+      "routeStrategy": "REJECT",
+      "rejectRule": "命中即拒绝，输出拒绝原因；高危指令（删除/提现/越权）无论置信度高低一律拒绝；拒绝后记录审计日志"
+    }
+  ]
+}

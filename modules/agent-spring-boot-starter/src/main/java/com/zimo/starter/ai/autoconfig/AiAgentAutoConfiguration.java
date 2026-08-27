@@ -1,0 +1,396 @@
+package com.zimo.starter.ai.autoconfig;
+
+import com.zimo.framework.common.storage.FileStorageService;
+import com.zimo.starter.ai.AiAgentProperties;
+import com.zimo.starter.ai.AiAgentService;
+import com.zimo.starter.ai.agent.AiAgentProfile;
+import com.zimo.starter.ai.agent.AiAgentProfileResolver;
+import com.zimo.starter.ai.agent.AiAgentRouteRequest;
+import com.zimo.starter.ai.agent.AiHarnessAgentFactory;
+import com.zimo.starter.ai.agent.LoggingToolExecutionListener;
+import com.zimo.starter.ai.agent.AiCapabilityProvider;
+import com.zimo.starter.ai.agent.ToolExecutionListener;
+import com.zimo.starter.ai.agent.AiHarnessAgentRegistry;
+import com.zimo.starter.ai.agent.AiHarnessAgentRouter;
+import com.zimo.starter.ai.agent.AiHarnessSessionKeyFactory;
+import com.zimo.starter.ai.channel.AiChannelHandler;
+import com.zimo.starter.ai.channel.AiChannelIntentHandler;
+import com.zimo.starter.ai.chat.AiChatClient;
+import com.zimo.starter.ai.chat.OpenAiCompatibleChatClient;
+import com.zimo.module.agentmemory.memory.AiMemoryService;
+import com.zimo.starter.ai.runtime.AiAgentRuntime;
+import com.zimo.starter.ai.runtime.AiAgentRuntimeFactory;
+import com.zimo.starter.ai.skill.AiSkill;
+import com.zimo.starter.ai.skill.AiSkillRegistry;
+import com.zimo.starter.ai.skill.DefaultAiSkills;
+import com.zimo.starter.ai.skill.ToolApprovalHandler;
+import com.zimo.starter.ai.skill.ToolGuard;
+import com.zimo.starter.ai.skill.ToolHook;
+import com.zimo.starter.ai.skill.ToolPipeline;
+import com.zimo.starter.ai.preset.AiAgentPreset;
+import com.zimo.starter.ai.preset.AiAgentPresetRegistry;
+import java.util.List;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.web.client.RestClientAutoConfiguration;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.annotation.Bean;
+import org.springframework.web.client.RestClient;
+
+/**
+ * AI 智能体运行时自动装配。
+ *
+ * <p>仅装配聊天、技能注册、渠道、MCP 与 A2A 运行时能力；管理接口、Service 和 DAO
+ * 由 module-ai 业务模块负责。</p>
+ *
+ * @author Codex
+ * @since 2026-07-23
+ */
+@AutoConfiguration(after = RestClientAutoConfiguration.class)
+@EnableConfigurationProperties(AiAgentProperties.class)
+@ConditionalOnProperty(prefix = "ai.agent", name = "enabled", havingValue = "true", matchIfMissing = true)
+public class AiAgentAutoConfiguration {
+
+    /** 注册回显内置技能。 */
+    @Bean
+    @ConditionalOnMissingBean(name = "echoAiSkill")
+    public AiSkill echoAiSkill() {
+        return DefaultAiSkills.echo();
+    }
+
+    /** 注册摘要内置技能。 */
+    @Bean
+    @ConditionalOnMissingBean(name = "summarizeAiSkill")
+    public AiSkill summarizeAiSkill() {
+        return DefaultAiSkills.summarize();
+    }
+
+    /** 注册计划生成内置技能。 */
+    @Bean
+    @ConditionalOnMissingBean(name = "generatePlanAiSkill")
+    public AiSkill generatePlanAiSkill() {
+        return DefaultAiSkills.generatePlan();
+    }
+
+    /** 注册插件任务路由内置技能。 */
+    @Bean
+    @ConditionalOnMissingBean(name = "routePluginTaskAiSkill")
+    public AiSkill routePluginTaskAiSkill() {
+        return DefaultAiSkills.routePluginTask();
+    }
+
+    /**
+     * 互操作规则文件读取器（AGENTS.md / CLAUDE.md 发现与解析，dsh A8）。
+     * 从应用工作目录向上最多 8 层发现，文件名按配置顺序优先。
+     */
+    @Bean
+    @ConditionalOnMissingBean(name = "agentInstructionReader")
+    public com.zimo.starter.ai.interop.AgentInstructionReader agentInstructionReader(
+            AiAgentProperties properties) {
+        return new com.zimo.starter.ai.interop.AgentInstructionReader(
+                properties.getInteropInstructionFiles(),
+                null,
+                8);
+    }
+
+    /** 互操作规则注入服务：渲染规则片段、供技能与提示词拼接消费。 */
+    @Bean
+    @ConditionalOnMissingBean
+    public com.zimo.starter.ai.interop.AgentInteropService agentInteropService(
+            com.zimo.starter.ai.interop.AgentInstructionReader reader) {
+        return new com.zimo.starter.ai.interop.AgentInteropService(reader);
+    }
+
+    /** 互操作规则内存技能（interop_instructions，可按 topic 过滤）。 */
+    @Bean
+    @ConditionalOnMissingBean(name = "instructionFileSkill")
+    public com.zimo.starter.ai.interop.InstructionFileSkill instructionFileSkill(
+            com.zimo.starter.ai.interop.AgentInteropService interopService,
+            AiAgentProperties properties) {
+        return new com.zimo.starter.ai.interop.InstructionFileSkill(
+                interopService, properties.getInteropInstructionMaxChars());
+    }
+
+    /** 外部 harness 子智能体 provider（dsh A8 meta-harness）：解析 agentConfig.externalHarness.tasks[]。 */
+    @Bean
+    @ConditionalOnMissingBean
+    public com.zimo.starter.ai.interop.ExternalHarnessSubagentProvider externalHarnessSubagentProvider() {
+        return com.zimo.starter.ai.interop.ExternalHarnessSubagentProvider.localDefault();
+    }
+
+    /**
+     * AGENTS.md hook 注册表（dsh A8：Claude Code hooks 桥接）：
+     * 从规则文件解析 {@code hook:} 指令并按触发点注册。
+     */
+    @Bean
+    @ConditionalOnMissingBean(name = "agentHookRegistry")
+    public com.zimo.starter.ai.interop.AgentHookRegistry agentHookRegistry(
+            com.zimo.starter.ai.interop.AgentInstructionReader reader,
+            AiAgentProperties properties) {
+        com.zimo.starter.ai.interop.AgentHookRegistry registry =
+                new com.zimo.starter.ai.interop.AgentHookRegistry();
+        if (!properties.isInteropInstructionFilesEnabled()) {
+            return registry;
+        }
+        com.zimo.starter.ai.interop.AgentHookParser parser =
+                new com.zimo.starter.ai.interop.AgentHookParser();
+        for (com.zimo.starter.ai.interop.InteropInstruction instruction : reader.findAll()) {
+            registry.registerAll(parser.parse(instruction.instructions()));
+        }
+        return registry;
+    }
+
+    /** AGENTS.md hook → ToolPipeline 桥接器（ToolHook Bean，自动汇入工具流水线 pre/post 阶段）。 */
+    @Bean
+    @ConditionalOnMissingBean(name = "agentHookBridge")
+    public com.zimo.starter.ai.interop.AgentHookBridge agentHookBridge(
+            com.zimo.starter.ai.interop.AgentHookRegistry registry,
+            com.zimo.starter.ai.sandbox.SandboxBackend sandboxBackend) {
+        return new com.zimo.starter.ai.interop.AgentHookBridge(registry, sandboxBackend);
+    }
+
+    /** 汇总全部技能并创建运行时注册表。 */
+    @Bean
+    @ConditionalOnMissingBean
+    public AiSkillRegistry aiSkillRegistry(List<AiSkill> skills, RestClient.Builder restClientBuilder,
+            java.util.List<ToolHook> hooks,
+            java.util.List<ToolGuard> guards,
+            org.springframework.beans.factory.ObjectProvider<ToolApprovalHandler> approvalProvider,
+            AiAgentProperties properties) {
+        ToolPipeline pipeline = new ToolPipeline(
+                hooks == null ? java.util.List.of() : hooks,
+                guards == null ? java.util.List.of() : guards,
+                approvalProvider.getIfAvailable(),
+                properties.getToolPipelineMaxRetries());
+        List<AiSkill> allSkills = new java.util.ArrayList<>(skills == null ? List.of() : skills);
+        if (properties.isInteropInstructionFilesEnabled()
+                && properties.isInteropInstructionSkill()) {
+            allSkills.add(new com.zimo.starter.ai.interop.InstructionFileSkill(
+                    new com.zimo.starter.ai.interop.AgentInteropService(
+                            new com.zimo.starter.ai.interop.AgentInstructionReader(
+                                    properties.getInteropInstructionFiles(), null, 8)),
+                    properties.getInteropInstructionMaxChars()));
+        }
+        return new AiSkillRegistry(allSkills, restClientBuilder, pipeline);
+    }
+
+    /** 创建智能体运行时工厂。 */
+    @Bean
+    @ConditionalOnMissingBean
+    public AiAgentRuntimeFactory aiAgentRuntimeFactory() {
+        return new AiAgentRuntimeFactory();
+    }
+
+    /** 根据配置和技能注册表创建智能体运行时描述。 */
+    @Bean
+    @ConditionalOnMissingBean
+    public AiAgentRuntime aiAgentRuntime(
+            AiAgentProperties properties,
+            AiSkillRegistry skillRegistry,
+            AiAgentRuntimeFactory runtimeFactory) {
+        return runtimeFactory.create(properties, skillRegistry);
+    }
+
+    /** 创建 OpenAI 兼容聊天客户端。 */
+    @Bean
+    @ConditionalOnMissingBean
+    public AiChatClient aiChatClient(AiAgentProperties properties, RestClient.Builder restClientBuilder) {
+        return new OpenAiCompatibleChatClient(properties, restClientBuilder);
+    }
+
+    /** 智能体模式预设注册表（模式=能力+配置组合），支持业务注册自定义预设。 */
+    @Bean
+    @ConditionalOnMissingBean
+    public AiAgentPresetRegistry aiAgentPresetRegistry() {
+        return new AiAgentPresetRegistry();
+    }
+
+    /** 创建按配置构建独立 HarnessAgent 的工厂。 */
+    @Bean
+    @ConditionalOnMissingBean
+    public AiHarnessAgentFactory aiHarnessAgentFactory(
+            AiAgentProperties properties,
+            AiSkillRegistry skillRegistry,
+            ObjectProvider<FileStorageService> storageServiceProvider,
+            com.fasterxml.jackson.databind.ObjectMapper objectMapper,
+            AiMemoryService memoryService,
+            java.util.List<ToolExecutionListener> toolListeners,
+            java.util.List<AiCapabilityProvider> capabilities,
+            org.springframework.beans.factory.ObjectProvider<com.zimo.starter.ai.plugin.DynamicPluginManager> pluginManagerProvider,
+            AiAgentPresetRegistry presetRegistry,
+            com.zimo.starter.ai.interop.ExternalHarnessSubagentProvider externalHarnessProvider) {
+        FileStorageService storageService = storageServiceProvider.getIfAvailable();
+        return new AiHarnessAgentFactory(properties, skillRegistry, storageService, objectMapper, memoryService,
+                toolListeners, capabilities, pluginManagerProvider.getIfAvailable(), presetRegistry,
+                externalHarnessProvider);
+    }
+
+    /** 动态插件管理器（data/plugins/*.jar，启动时自动扫描装载）。 */
+    @Bean(destroyMethod = "close")
+    @ConditionalOnMissingBean
+    public com.zimo.starter.ai.plugin.DynamicPluginManager dynamicPluginManager(
+            AiAgentProperties properties) {
+        com.zimo.starter.ai.plugin.DynamicPluginManager manager =
+                new com.zimo.starter.ai.plugin.DynamicPluginManager(
+                        properties.getPluginDir());
+        // 启动时扫描已存在插件 jar
+        java.io.File dir = new java.io.File(properties.getPluginDir());
+        if (dir.isDirectory()) {
+            java.io.File[] jars = dir.listFiles((d, n) -> n.endsWith(".jar"));
+            if (jars != null) {
+                for (java.io.File jar : jars) {
+                    manager.loadJar(jar.toPath());
+                }
+            }
+        }
+        // 插件热重载：监听 jar 变更（新增/修改/删除自动 reload）
+        if (properties.isPluginWatchEnabled()) {
+            manager.startWatcher(properties.getPluginWatchIntervalMs());
+        }
+        return manager;
+    }
+
+    /** 轻量事件总线（Spring 事件桥，三类 AI 事件域）。 */
+    @Bean
+    @ConditionalOnMissingBean
+    public com.zimo.framework.common.ai.event.AiEventPublisher aiEventPublisher(
+            org.springframework.context.ApplicationEventPublisher publisher) {
+        return new com.zimo.starter.ai.event.SpringAiEventPublisher(publisher);
+    }
+
+    /** 工具调用事件发布钩子（ToolCallEvent）。 */
+    @Bean
+    @ConditionalOnMissingBean(name = "eventPublishingToolExecutionListener")
+    public ToolExecutionListener eventPublishingToolExecutionListener(
+            com.zimo.framework.common.ai.event.AiEventPublisher eventPublisher) {
+        return new com.zimo.starter.ai.agent.EventPublishingToolExecutionListener(eventPublisher);
+    }
+
+    /** 默认沙箱后端（本地直通）；外部可注册自定义 SandboxBackend 替换（对应 dsh ctx.sandbox）。 */
+    @Bean
+    @ConditionalOnMissingBean
+    public com.zimo.starter.ai.sandbox.SandboxBackend localSandboxBackend() {
+        return new com.zimo.starter.ai.sandbox.LocalSandboxBackend();
+    }
+
+    /** 默认工具执行钩子（日志审计）；外部可注册其他 ToolExecutionListener Bean 组合。 */
+    @Bean
+    @ConditionalOnMissingBean
+    public ToolExecutionListener loggingToolExecutionListener() {
+        return new LoggingToolExecutionListener();
+    }
+
+    /** 创建具备租户隔离、配置指纹和 LRU 回收能力的 HarnessAgent 注册表。 */
+    @Bean(destroyMethod = "close")
+    @ConditionalOnMissingBean
+    public AiHarnessAgentRegistry aiHarnessAgentRegistry(
+            AiHarnessAgentFactory factory,
+            AiAgentProperties properties) {
+        return new AiHarnessAgentRegistry(factory, properties);
+    }
+
+    /** 创建五维会话隔离键工厂。 */
+    @Bean
+    @ConditionalOnMissingBean
+    public AiHarnessSessionKeyFactory aiHarnessSessionKeyFactory() {
+        return new AiHarnessSessionKeyFactory();
+    }
+
+    /** 创建支持渠道绑定和请求租户默认配置的分层路由器。 */
+    @Bean
+    @ConditionalOnMissingBean
+    public AiHarnessAgentRouter aiHarnessAgentRouter(
+            AiAgentProperties properties,
+            ObjectProvider<AiAgentProfileResolver> profileResolver,
+            org.springframework.beans.factory.ObjectProvider<com.zimo.starter.ai.interop.AgentInteropService> interopProvider) {
+        return AiHarnessAgentRouter.withDefaultProvider(
+                profileResolver.getIfAvailable(),
+                request -> defaultProfile(properties, request, interopProvider.getIfAvailable()));
+    }
+
+    /** 创建智能体聊天服务。 */
+    @Bean
+    @ConditionalOnMissingBean
+    public AiAgentService aiAgentService(
+            AiAgentProperties properties,
+            AiSkillRegistry skillRegistry,
+            AiAgentRuntime runtime,
+            AiChatClient chatClient,
+            AiHarnessAgentRouter router,
+            AiHarnessAgentRegistry registry,
+            AiHarnessSessionKeyFactory sessionKeyFactory,
+            org.springframework.beans.factory.ObjectProvider<com.zimo.framework.common.storage.FileStorageService> fileStorageProvider,
+            org.springframework.beans.factory.ObjectProvider<com.zimo.module.agentmemory.storage.OltpMemoryRepository> oltpProvider,
+            org.springframework.beans.factory.ObjectProvider<com.zimo.framework.common.ai.event.AiEventPublisher> eventPublisherProvider,
+            java.util.List<com.zimo.starter.ai.agent.AiRequestInterceptor> requestInterceptors,
+            java.util.List<com.zimo.starter.ai.agent.AiAgentMiddleware> middlewares,
+            org.springframework.beans.factory.ObjectProvider<com.zimo.starter.ai.plugin.DynamicPluginManager> pluginManagerProvider) {
+        List<com.zimo.starter.ai.agent.AiAgentMiddleware> allMiddlewares =
+                new java.util.ArrayList<>(middlewares == null ? List.of() : middlewares);
+        com.zimo.starter.ai.plugin.DynamicPluginManager pluginManager = pluginManagerProvider.getIfAvailable();
+        if (pluginManager != null) {
+            allMiddlewares.addAll(pluginManager.dynamicMiddlewares());
+        }
+        return new AiAgentService(
+                properties,
+                skillRegistry,
+                runtime,
+                chatClient,
+                router,
+                registry,
+                sessionKeyFactory,
+                fileStorageProvider.getIfAvailable(),
+                oltpProvider.getIfAvailable(),
+                eventPublisherProvider.getIfAvailable(),
+                requestInterceptors,
+                allMiddlewares,
+                pluginManager == null ? null : pluginManager.eventBus());
+    }
+
+    /** 创建渠道消息处理器，并按需使用业务模块提供的默认智能体解析器。 */
+    @Bean
+    @ConditionalOnMissingBean
+    public AiChannelHandler aiChannelHandler(
+            AiAgentService aiAgentService,
+            AiSkillRegistry skillRegistry,
+            ObjectProvider<AiAgentProfileResolver> profileResolver,
+            List<AiChannelIntentHandler> intentHandlers) {
+        return new AiChannelHandler(
+                aiAgentService, skillRegistry, profileResolver.getIfAvailable(), intentHandlers);
+    }
+
+    // 注：AiMemoryService / AiMemorySensitiveFilter Bean 已迁移至 module-agent-memory
+    // （AgentMemoryAutoConfiguration），此处不再重复定义，避免双实例。
+
+    private AiAgentProfile defaultProfile(
+            AiAgentProperties properties,
+            AiAgentRouteRequest request,
+            com.zimo.starter.ai.interop.AgentInteropService interopService) {
+        String tenantId = request == null || request.tenantId() == null
+                        || request.tenantId().isBlank()
+                ? "_"
+                : request.tenantId().trim();
+        String agentId = properties.getName() == null || properties.getName().isBlank()
+                ? "ai-agent"
+                : properties.getName().trim();
+        String systemPrompt = properties.getSystemPrompt();
+        if (properties.isInteropInstructionFilesEnabled() && interopService != null) {
+            String block = interopService.instructionBlock(
+                    properties.getInteropInstructionMaxChars());
+            if (!block.isBlank()) {
+                systemPrompt = (systemPrompt == null ? "" : systemPrompt)
+                        + "\n\n【仓库规则（AGENTS.md/CLAUDE.md）】\n" + block;
+            }
+        }
+        return new AiAgentProfile(
+                agentId,
+                tenantId,
+                agentId,
+                properties.getModelName(),
+                systemPrompt,
+                List.of(),
+                true);
+    }
+}

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.zimo</groupId>
+        <artifactId>modules</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>module-tools</artifactId>
+    <packaging>pom</packaging>
+    <name>module-tools</name>
+    <description>通用内置工具库：文件处理/表格运算/邮件/定时任务/HTTP/代码沙箱/数据转换/计算器</description>
+
+    <modules>
+        <module>module-tools-core</module>
+        <module>module-tools-autoconfig</module>
+    </modules>
+</project>

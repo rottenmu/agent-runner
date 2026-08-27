@@ -1,0 +1,2 @@
+com.zimo.module.ds.autoconfig.DsAutoConfiguration
+com.zimo.module.ds.autoconfig.DsControllerScanAutoConfiguration

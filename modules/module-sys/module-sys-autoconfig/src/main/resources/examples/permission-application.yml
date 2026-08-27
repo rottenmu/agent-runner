@@ -1,0 +1,76 @@
+plugin:
+  sys:
+    # 系统管理插件开关，默认开启。
+    enabled: true
+    # 注册到平台插件/智能体上下文中的名称。
+    agent-name: sys
+
+manufacture:
+  permission:
+    # 权限体系总开关，关闭后不自动装载权限增强能力。
+    enabled: true
+
+    data-scope:
+      # 数据权限插件开关，默认开启。
+      enabled: true
+      # 默认数据范围标识，业务可按自己的角色模型映射。
+      default-scope: DEPT_AND_CHILDREN
+      # 业务表组织字段名。
+      dept-column: dept_id
+      # 业务表创建人字段名。
+      user-column: create_by
+      # 是否允许超级管理员跳过数据过滤。
+      ignore-admin: true
+      # 超级管理员角色标识。
+      admin-role-key: admin
+
+    field-mask:
+      # 字段脱敏开关，默认开启。
+      enabled: true
+      # 默认脱敏占位符。
+      default-mask: "******"
+      # 手机号脱敏规则。
+      phone-pattern: "(\\d{3})\\d{4}(\\d{4})"
+      phone-replacement: "$1****$2"
+      # 邮箱脱敏规则。
+      email-pattern: "(.).+(@.+)"
+      email-replacement: "$1***$2"
+      # 默认参与脱敏的字段名。
+      fields:
+        - password
+        - phone
+        - email
+        - idCard
+        - address
+
+    operation-log:
+      # 操作日志开关，默认开启。
+      enabled: true
+      # 是否记录查询参数和路径参数。
+      record-request-params: true
+      # 请求体默认不记录，避免敏感信息或大报文入库。
+      record-request-body: false
+      # 响应体默认不记录，避免大响应和敏感数据入库。
+      record-response-body: false
+      # 是否记录异常堆栈。
+      record-exception-stack: true
+      # 单条日志最大内容长度。
+      max-content-length: 4096
+      # 操作日志排除路径。
+      exclude-paths:
+        - /actuator/**
+        - /assets/**
+        - /favicon.ico
+
+    whitelist:
+      # 权限拦截白名单开关，默认开启。
+      enabled: true
+      # 命中以下路径时跳过功能权限拦截。
+      paths:
+        - /api/auth/login
+        - /api/auth/register
+        - /api/auth/logout
+        - /api/auth/info
+        - /actuator/health
+        - /assets/**
+        - /favicon.ico

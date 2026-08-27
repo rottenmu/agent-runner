@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.zimo</groupId>
+        <artifactId>agent-trace</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>agent-trace-core</artifactId>
+    <name>module-agent-deploy-core</name>
+    <description>多智能体部署平台核心：HarnessAgent 装配工厂/注册表/会话/多存储/可观测性</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.zimo</groupId>
+            <artifactId>framework-common</artifactId>
+            <version>1.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.zimo</groupId>
+            <artifactId>agent-spring-boot-starter</artifactId>
+            <version>1.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

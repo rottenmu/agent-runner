@@ -1,0 +1,38 @@
+# ===== Maven 构建产物 =====
+target/
+
+# ===== 前端（本仓库仅托管后端代码） =====
+frontend/
+
+# ===== 运行时数据 =====
+data/
+logs/
+tmp/
+*.log
+*.db
+*.sst
+*.lst
+hs_err_pid*.log
+
+# ===== 本地工具 / Agent 运行时 =====
+.agentscope/
+.codegraph/
+.codex/
+.superpowers/
+.claude/
+.cursor/
+.workbuddy/
+.codebuddy/
+.skills/
+
+# ===== IDE / 编辑器 =====
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# ===== 系统文件 =====
+.DS_Store
+Thumbs.db
+desktop.ini

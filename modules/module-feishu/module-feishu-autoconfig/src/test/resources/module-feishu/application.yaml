@@ -1,0 +1,7 @@
+plugin:
+  feishu:
+    datasource:
+      url: ${FEISHU_DATABASE_URL:jdbc:sqlite:file:feishu-module-test?mode=memory&cache=shared}
+      username:
+      password:
+      driver-class-name: org.sqlite.JDBC

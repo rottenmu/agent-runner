@@ -1,0 +1,16 @@
+FROM eclipse-temurin:17-jre
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN groupadd --gid 10001 app \
+    && useradd --uid 10001 --gid app --no-create-home --shell /usr/sbin/nologin app
+
+WORKDIR /app
+COPY artifacts/backend/agent-application.jar /app/application.jar
+RUN mkdir -p /app/logs /app/data && chown -R app:app /app/logs /app/data
+
+EXPOSE 9080
+USER app
+ENTRYPOINT ["java", "-jar", "/app/application.jar"]

@@ -1,0 +1,49 @@
+name: agent-runner
+
+services:
+  backend:
+    container_name: agent-runner-backend
+    image: agent-runner-backend:${PRODUCTION_STUDIO_RELEASE:?required}
+    build:
+      context: ../..
+      dockerfile: deploy/aliyun/Dockerfile.backend
+    environment:
+      LOGGING_FILE_PATH: /app/logs
+    expose:
+      - "9900"
+    volumes:
+      - ${PRODUCTION_STUDIO_LOG_DIR:-/opt/app/production_studio/shared/logs}:/app/logs
+      - ${PRODUCTION_STUDIO_DATA_DIR:-/opt/app/production_studio/shared/data}:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9900/api/plugins"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+    restart: unless-stopped
+    networks:
+      - agent-runner
+
+  frontend:
+    container_name: agent-runner-frontend
+    image: agent-runner-frontend:${PRODUCTION_STUDIO_RELEASE:?required}
+    build:
+      context: ../..
+      dockerfile: deploy/aliyun/Dockerfile.frontend
+    ports:
+      - "16600:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    restart: unless-stopped
+    networks:
+      - agent-runner
+
+networks:
+  agent-runner:
+    name: agent-runner-network

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.zimo</groupId>
+        <artifactId>agent-runner</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>modules</artifactId>
+    <packaging>pom</packaging>
+
+    <modules>
+        <module>agent-spring-boot-starter</module>
+        <module>module-sys</module>
+        <module>agent-auth</module>
+        <module>agent-harness</module>
+        <module>module-feishu</module>
+        <module>agent-datasource</module>
+        <module>agent-rag</module>
+        <module>agent-intent</module>
+        <module>module-tools</module>
+        <module>module-security</module>
+        <module>agent-trace</module>
+        <module>agent-memory</module>
+    </modules>
+</project>

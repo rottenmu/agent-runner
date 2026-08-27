@@ -1,0 +1,2 @@
+com.zimo.module.rag.autoconfig.RagAutoConfiguration
+com.zimo.module.rag.autoconfig.RagControllerScanAutoConfiguration

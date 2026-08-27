@@ -1,0 +1,5 @@
+com.zimo.framework.autoconfig.MybatisPlusConfig
+com.zimo.framework.autoconfig.FrameworkWebAutoConfiguration
+com.zimo.framework.autoconfig.FrameworkApiRegistryAutoConfiguration
+com.zimo.framework.autoconfig.storage.RocksdbStorageAutoConfiguration
+com.zimo.framework.autoconfig.storage.FileStorageAutoConfiguration

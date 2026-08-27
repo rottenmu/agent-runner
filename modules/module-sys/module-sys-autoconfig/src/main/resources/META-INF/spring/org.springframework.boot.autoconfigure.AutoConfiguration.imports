@@ -1,0 +1,3 @@
+com.zimo.module.sys.autoconfig.SysAutoConfiguration
+com.zimo.module.sys.autoconfig.PermissionAutoConfiguration
+com.zimo.module.sys.autoconfig.SysApiRegistryAutoConfiguration

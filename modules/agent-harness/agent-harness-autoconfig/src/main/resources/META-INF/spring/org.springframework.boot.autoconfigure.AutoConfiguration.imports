@@ -1,0 +1,9 @@
+com.zimo.module.ai.autoconfig.AiModuleAutoConfiguration
+com.zimo.module.ai.autoconfig.AiSkillMultipartWebAutoConfiguration
+com.zimo.module.ai.autoconfig.AiSkillAdminAutoConfiguration
+com.zimo.module.ai.autoconfig.AiModelConfigAutoConfiguration
+com.zimo.module.ai.autoconfig.AiControllerScanAutoConfiguration
+com.zimo.module.ai.autoconfig.AiSkillCoreAutoConfiguration
+com.zimo.module.ai.autoconfig.AiWorkflowAutoConfiguration
+com.zimo.module.ai.autoconfig.AiCollabAutoConfiguration
+com.zimo.module.ai.autoconfig.AiObservAutoConfiguration

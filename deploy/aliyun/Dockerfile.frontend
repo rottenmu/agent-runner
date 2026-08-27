@@ -1,0 +1,10 @@
+FROM nginx:1.27-alpine
+
+RUN apk add --no-cache unzip
+COPY deploy/aliyun/nginx.conf /etc/nginx/conf.d/default.conf
+COPY artifacts/frontend/frontend.zip /tmp/frontend.zip
+RUN mkdir -p /usr/share/nginx/html \
+    && unzip -qo /tmp/frontend.zip -d /usr/share/nginx/html \
+    && rm /tmp/frontend.zip
+
+EXPOSE 80
