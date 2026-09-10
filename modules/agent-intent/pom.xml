@@ -17,6 +17,5 @@
 
     <modules>
         <module>agent-intent-core</module>
-        <module>agent-intent-autoconfig</module>
     </modules>
 </project>

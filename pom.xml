@@ -55,17 +55,7 @@
             </dependency>
             <dependency>
                 <groupId>com.zimo</groupId>
-                <artifactId>module-sys-autoconfig</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.zimo</groupId>
                 <artifactId>module-sys-core</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.zimo</groupId>
-                <artifactId>module-auth-autoconfig</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
@@ -75,12 +65,7 @@
             </dependency>
             <dependency>
                 <groupId>com.zimo</groupId>
-                <artifactId>agent-spring-boot-starter</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.zimo</groupId>
-                <artifactId>module-ai-autoconfig</artifactId>
+                <artifactId>framework-ai</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
@@ -90,18 +75,7 @@
             </dependency>
             <dependency>
                 <groupId>com.zimo</groupId>
-                <artifactId>module-feishu-autoconfig</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.zimo</groupId>
                 <artifactId>module-feishu-core</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>com.zimo</groupId>
-                <artifactId>module-datasource-autoconfig</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
@@ -109,21 +83,9 @@
                 <artifactId>module-datasource-core</artifactId>
                 <version>${project.version}</version>
             </dependency>
-
-            <dependency>
-                <groupId>com.zimo</groupId>
-                <artifactId>rag-autoconfig</artifactId>
-                <version>${project.version}</version>
-            </dependency>
             <dependency>
                 <groupId>com.zimo</groupId>
                 <artifactId>agent-rag-core</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>com.zimo</groupId>
-                <artifactId>module-tools-autoconfig</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
@@ -133,18 +95,7 @@
             </dependency>
             <dependency>
                 <groupId>com.zimo</groupId>
-                <artifactId>agent-intent-autoconfig</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.zimo</groupId>
                 <artifactId>module-tools-core</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>com.zimo</groupId>
-                <artifactId>module-security-autoconfig</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
@@ -152,14 +103,11 @@
                 <artifactId>module-security-core</artifactId>
                 <version>${project.version}</version>
             </dependency>
-
-
             <dependency>
                 <groupId>net.objecthunter</groupId>
                 <artifactId>exp4j</artifactId>
                 <version>0.4.8</version>
             </dependency>
-
             <dependency>
                 <groupId>com.larksuite.oapi</groupId>
                 <artifactId>oapi-sdk</artifactId>
@@ -171,13 +119,11 @@
                     </exclusion>
                 </exclusions>
             </dependency>
-
             <dependency>
                 <groupId>com.tngtech.archunit</groupId>
                 <artifactId>archunit-junit5</artifactId>
                 <version>1.3.0</version>
             </dependency>
-
             <dependency>
                 <groupId>com.baomidou</groupId>
                 <artifactId>mybatis-plus-spring-boot3-starter</artifactId>

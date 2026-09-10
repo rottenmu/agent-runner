@@ -3,8 +3,8 @@ package com.zimo.module.ai.management;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.zimo.starter.ai.skill.AiApiSkillConfig;
-import com.zimo.starter.ai.skill.AiSkillRegistry;
+import com.zimo.framework.ai.skill.AiApiSkillConfig;
+import com.zimo.framework.ai.skill.AiSkillRegistry;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;

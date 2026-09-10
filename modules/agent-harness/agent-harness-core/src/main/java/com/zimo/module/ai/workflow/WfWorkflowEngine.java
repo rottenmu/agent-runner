@@ -1,8 +1,8 @@
 package com.zimo.module.ai.workflow;
 
-import com.zimo.starter.ai.chat.AiChatClient;
-import com.zimo.starter.ai.chat.AiChatRequest;
-import com.zimo.starter.ai.chat.AiChatResponse;
+import com.zimo.framework.ai.chat.AiChatClient;
+import com.zimo.framework.ai.chat.AiChatRequest;
+import com.zimo.framework.ai.chat.AiChatResponse;
 import java.util.LinkedHashMap;
 import javax.script.ScriptContext;
 import javax.script.ScriptEngine;

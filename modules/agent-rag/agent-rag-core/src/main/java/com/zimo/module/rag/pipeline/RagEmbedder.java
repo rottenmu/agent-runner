@@ -1,7 +1,7 @@
 package com.zimo.module.rag.pipeline;
 
 import com.zimo.module.rag.RagProperties;
-import com.zimo.starter.ai.AiAgentProperties;
+import com.zimo.framework.ai.AiAgentProperties;
 import cn.hutool.core.util.StrUtil;
 import java.util.ArrayList;
 import java.util.List;

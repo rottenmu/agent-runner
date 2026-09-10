@@ -14,7 +14,6 @@
     <packaging>pom</packaging>
 
     <modules>
-        <module>agent-spring-boot-starter</module>
         <module>module-sys</module>
         <module>agent-auth</module>
         <module>agent-harness</module>

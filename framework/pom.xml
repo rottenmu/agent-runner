@@ -16,5 +16,6 @@
     <modules>
         <module>framework-common</module>
         <module>framework-autoconfig</module>
+        <module>framework-ai</module>
     </modules>
 </project>

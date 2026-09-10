@@ -4,8 +4,8 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.zimo.framework.common.validation.ValidationUtil;
 import cn.hutool.core.util.StrUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.zimo.starter.ai.AiAgentReply;
-import com.zimo.starter.ai.AiAgentService;
+import com.zimo.framework.ai.AiAgentReply;
+import com.zimo.framework.ai.AiAgentService;
 import com.zimo.module.rag.service.RagRetrieveService;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -294,7 +294,7 @@ public class TestRunnerService {
         try {
             if (StringUtils.hasText(agentId)) {
                 AiAgentReply reply = aiAgentService.chat(message,
-                        new com.zimo.starter.ai.agent.AiAgentRouteRequest("default", "test",
+                        new com.zimo.framework.ai.agent.AiAgentRouteRequest("default", "test",
                                 "tester", "test-session", null, null));
                 return reply == null ? "" : reply.content();
             }

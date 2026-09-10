@@ -20,48 +20,48 @@
 
         <dependency>
             <groupId>com.zimo</groupId>
-            <artifactId>module-sys-autoconfig</artifactId>
+            <artifactId>module-sys-core</artifactId>
         </dependency>
         <dependency>
             <groupId>com.zimo</groupId>
-            <artifactId>module-auth-autoconfig</artifactId>
+            <artifactId>module-auth-core</artifactId>
         </dependency>
         <dependency>
             <groupId>com.zimo</groupId>
-            <artifactId>module-ai-autoconfig</artifactId>
+            <artifactId>agent-harness-core</artifactId>
         </dependency>
         <dependency>
             <groupId>com.zimo</groupId>
-            <artifactId>module-feishu-autoconfig</artifactId>
+            <artifactId>module-feishu-core</artifactId>
         </dependency>
         <dependency>
             <groupId>com.zimo</groupId>
-            <artifactId>module-datasource-autoconfig</artifactId>
+            <artifactId>module-datasource-core</artifactId>
         </dependency>
         <dependency>
             <groupId>com.zimo</groupId>
-            <artifactId>rag-autoconfig</artifactId>
+            <artifactId>agent-rag-core</artifactId>
         </dependency>
         <dependency>
             <groupId>com.zimo</groupId>
-            <artifactId>agent-intent-autoconfig</artifactId>
+            <artifactId>agent-intent-core</artifactId>
         </dependency>
         <dependency>
             <groupId>com.zimo</groupId>
-            <artifactId>module-tools-autoconfig</artifactId>
+            <artifactId>module-tools-core</artifactId>
         </dependency>
         <dependency>
             <groupId>com.zimo</groupId>
-            <artifactId>module-security-autoconfig</artifactId>
+            <artifactId>module-security-core</artifactId>
         </dependency>
         <dependency>
             <groupId>com.zimo</groupId>
-            <artifactId>agent-trace-autoconfig</artifactId>
+            <artifactId>agent-trace-core</artifactId>
             <version>1.0.0</version>
         </dependency>
         <dependency>
             <groupId>com.zimo</groupId>
-            <artifactId>agent-memory-autoconfig</artifactId>
+            <artifactId>agent-memory-core</artifactId>
             <version>1.0.0</version>
         </dependency>
 

@@ -14,7 +14,6 @@
     <packaging>pom</packaging>
 
     <modules>
-        <module>agent-harness-autoconfig</module>
         <module>agent-harness-core</module>
     </modules>
 </project>

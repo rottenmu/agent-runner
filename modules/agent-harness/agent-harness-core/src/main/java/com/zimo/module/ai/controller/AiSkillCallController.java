@@ -1,8 +1,8 @@
 package com.zimo.module.ai.controller;
 
-import com.zimo.starter.ai.skill.AiSkillDescriptor;
-import com.zimo.starter.ai.skill.AiSkillRegistry;
-import com.zimo.starter.ai.skill.AiSkillResult;
+import com.zimo.framework.ai.skill.AiSkillDescriptor;
+import com.zimo.framework.ai.skill.AiSkillRegistry;
+import com.zimo.framework.ai.skill.AiSkillResult;
 import com.zimo.framework.common.ApiResponse;
 import java.util.List;
 import java.util.Map;
@@ -95,12 +95,12 @@ public class AiSkillCallController {
      * 显式 begin/end 建立执行链路，使工具流水线打点不丢失。
      */
     private AiSkillResult traceCall(String name, Map<String, Object> arguments) {
-        com.zimo.starter.ai.observ.TraceCollector.begin(
+        com.zimo.framework.ai.observ.TraceCollector.begin(
                 "direct-skill", "skill", name, "skill_call", "direct");
         try {
             return skillRegistry.call(name, arguments);
         } finally {
-            com.zimo.starter.ai.observ.TraceCollector.end("ok", name,
+            com.zimo.framework.ai.observ.TraceCollector.end("ok", name,
                     String.valueOf(arguments), 0, 0);
         }
     }

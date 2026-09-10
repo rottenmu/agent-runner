@@ -3,9 +3,9 @@ package com.zimo.module.tools.govern;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import cn.hutool.core.util.StrUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.zimo.starter.ai.mcp.ToolBridge;
-import com.zimo.starter.ai.skill.AiSkillResult;
-import com.zimo.starter.ai.skill.AiSkillRegistry;
+import com.zimo.framework.ai.mcp.ToolBridge;
+import com.zimo.framework.ai.skill.AiSkillResult;
+import com.zimo.framework.ai.skill.AiSkillRegistry;
 import com.zimo.framework.common.security.SecurityFacade;
 import com.zimo.module.tools.entity.ToolAgentPermission;
 import com.zimo.module.tools.mapper.ToolAgentPermissionMapper;
@@ -173,11 +173,11 @@ public class ToolGovernanceService implements ToolBridge {
                 }
                 result = skillResult.content();
             }
-            com.zimo.starter.ai.observ.TraceCollector.step("tool_call", toolName,
+            com.zimo.framework.ai.observ.TraceCollector.step("tool_call", toolName,
                     inputJson, truncate(result, 1500), System.currentTimeMillis() - start, "ok");
             return result;
         } catch (Exception e) {
-            com.zimo.starter.ai.observ.TraceCollector.step("tool_call", toolName,
+            com.zimo.framework.ai.observ.TraceCollector.step("tool_call", toolName,
                     inputJson, "{\"error\":\"" + safeMessage(e) + "\"}", System.currentTimeMillis() - start, "failed");
             throw e;
         }

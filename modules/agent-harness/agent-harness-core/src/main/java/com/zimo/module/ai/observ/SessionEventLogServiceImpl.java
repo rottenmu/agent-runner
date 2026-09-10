@@ -1,8 +1,8 @@
 package com.zimo.module.ai.observ;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.zimo.starter.ai.observ.TraceCollector;
-import com.zimo.starter.ai.observ.TraceObserver;
+import com.zimo.framework.ai.observ.TraceCollector;
+import com.zimo.framework.ai.observ.TraceObserver;
 import jakarta.annotation.PostConstruct;
 import java.util.HashMap;
 import java.util.List;

@@ -2,8 +2,8 @@ package com.zimo.module.feishu.agent;
 
 import com.zimo.module.feishu.cli.bitable.BitableRecordCreateRequest;
 import com.zimo.module.feishu.cli.bitable.FeishuBitableCliService;
-import com.zimo.starter.ai.skill.AiSkill;
-import com.zimo.starter.ai.skill.AiSkillResult;
+import com.zimo.framework.ai.skill.AiSkill;
+import com.zimo.framework.ai.skill.AiSkillResult;
 import java.util.Map;
 import java.util.Objects;
 

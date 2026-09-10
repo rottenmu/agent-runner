@@ -15,6 +15,5 @@
 
     <modules>
         <module>module-auth-core</module>
-        <module>module-auth-autoconfig</module>
     </modules>
 </project>

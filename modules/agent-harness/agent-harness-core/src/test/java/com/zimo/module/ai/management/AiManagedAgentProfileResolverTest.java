@@ -2,9 +2,9 @@ package com.zimo.module.ai.management;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.zimo.starter.ai.channel.AiChannelAgentBinding;
-import com.zimo.starter.ai.channel.AiChannelMessage;
-import com.zimo.starter.ai.skill.AiSkillRegistry;
+import com.zimo.framework.ai.channel.AiChannelAgentBinding;
+import com.zimo.framework.ai.channel.AiChannelMessage;
+import com.zimo.framework.ai.skill.AiSkillRegistry;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;

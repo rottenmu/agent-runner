@@ -118,7 +118,7 @@ public class RagRetrieveService {
                 results.add(toResult(s.chunk(), s.score(), false));
             }
         }
-        com.zimo.starter.ai.observ.TraceCollector.step("knowledge_retrieval",
+        com.zimo.framework.ai.observ.TraceCollector.step("knowledge_retrieval",
                 kbId == null ? "全部知识库" : "知识库#" + kbId,
                 "{\"query\":\"" + safeJson(query) + "\",\"kbId\":" + kbId + ",\"topK\":" + limit + "}",
                 "{\"hits\":" + results.size() + ",\"topScore\":" + (results.isEmpty() ? 0 : results.get(0).get("score")) + "}",

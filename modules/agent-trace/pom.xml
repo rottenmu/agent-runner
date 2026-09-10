@@ -17,7 +17,6 @@
 
     <modules>
         <module>agent-trace-core</module>
-        <module>agent-trace-autoconfig</module>
     </modules>
 
     <properties>

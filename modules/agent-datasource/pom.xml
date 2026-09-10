@@ -17,6 +17,5 @@
 
     <modules>
         <module>module-datasource-core</module>
-        <module>module-datasource-autoconfig</module>
     </modules>
 </project>

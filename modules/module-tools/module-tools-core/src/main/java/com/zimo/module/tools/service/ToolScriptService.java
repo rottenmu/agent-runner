@@ -5,7 +5,7 @@ import com.zimo.module.tools.mapper.ToolPythonScriptMapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.zimo.module.tools.govern.PythonScriptExecutor;
 import com.zimo.module.tools.govern.ToolRegistry;
-import com.zimo.starter.ai.sandbox.SandboxBackend;
+import com.zimo.framework.ai.sandbox.SandboxBackend;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.util.StringUtils;

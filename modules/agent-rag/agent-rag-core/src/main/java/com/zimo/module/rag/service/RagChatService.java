@@ -1,6 +1,6 @@
 package com.zimo.module.rag.service;
 
-import com.zimo.starter.ai.AiAgentProperties;
+import com.zimo.framework.ai.AiAgentProperties;
 import cn.hutool.core.util.StrUtil;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;

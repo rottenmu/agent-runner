@@ -1,0 +1,3 @@
+com.zimo.framework.ai.autoconfig.AiAgentAutoConfiguration
+com.zimo.framework.ai.autoconfig.IntentAutoConfiguration
+com.zimo.framework.ai.autoconfig.AiRuntimeControllerScanAutoConfiguration

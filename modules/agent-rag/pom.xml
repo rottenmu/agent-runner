@@ -17,6 +17,5 @@
 
     <modules>
         <module>agent-rag-core</module>
-        <module>rag-autoconfig</module>
     </modules>
 </project>

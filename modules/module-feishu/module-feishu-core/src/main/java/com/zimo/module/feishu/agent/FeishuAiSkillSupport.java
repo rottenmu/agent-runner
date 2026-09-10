@@ -4,7 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import cn.hutool.core.util.StrUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zimo.module.feishu.cli.FeishuCliCommandResult;
-import com.zimo.starter.ai.skill.AiSkillResult;
+import com.zimo.framework.ai.skill.AiSkillResult;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;

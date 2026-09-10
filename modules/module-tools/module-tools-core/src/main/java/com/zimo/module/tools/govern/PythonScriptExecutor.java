@@ -2,9 +2,9 @@ package com.zimo.module.tools.govern;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import cn.hutool.core.util.StrUtil;
-import com.zimo.starter.ai.sandbox.SandboxBackend;
-import com.zimo.starter.ai.sandbox.SandboxCommand;
-import com.zimo.starter.ai.sandbox.SandboxResult;
+import com.zimo.framework.ai.sandbox.SandboxBackend;
+import com.zimo.framework.ai.sandbox.SandboxCommand;
+import com.zimo.framework.ai.sandbox.SandboxResult;
 import java.util.List;
 import java.util.Map;
 import org.springframework.util.StringUtils;
@@ -110,7 +110,7 @@ public class PythonScriptExecutor implements ToolExecutor {
             if (sandbox != null) {
                 return sandbox.execute(command);
             }
-            return new com.zimo.starter.ai.sandbox.LocalSandboxBackend(TIMEOUT_SECONDS).execute(command);
+            return new com.zimo.framework.ai.sandbox.LocalSandboxBackend(TIMEOUT_SECONDS).execute(command);
         } catch (Exception e) {
             return SandboxResult.failed(stripStackTrace(e));
         }

@@ -17,6 +17,5 @@
 
     <modules>
         <module>module-tools-core</module>
-        <module>module-tools-autoconfig</module>
     </modules>
 </project>

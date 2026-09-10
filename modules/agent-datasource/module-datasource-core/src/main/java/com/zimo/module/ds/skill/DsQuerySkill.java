@@ -1,9 +1,9 @@
 package com.zimo.module.ds.skill;
 
-import com.zimo.starter.ai.skill.AiSkill;
+import com.zimo.framework.ai.skill.AiSkill;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
-import com.zimo.starter.ai.skill.AiSkillResult;
+import com.zimo.framework.ai.skill.AiSkillResult;
 import com.zimo.module.ds.connector.DsConnector;
 import com.zimo.module.ds.entity.DsDataSource;
 import com.zimo.module.ds.service.DsDataSourceService;

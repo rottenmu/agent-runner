@@ -1,7 +1,7 @@
 package com.zimo.module.trace.genai;
 
-import com.zimo.starter.ai.observ.TraceCollector;
-import com.zimo.starter.ai.observ.TraceObserver;
+import com.zimo.framework.ai.observ.TraceCollector;
+import com.zimo.framework.ai.observ.TraceObserver;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;

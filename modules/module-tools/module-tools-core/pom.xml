@@ -22,7 +22,7 @@
         </dependency>
         <dependency>
             <groupId>com.zimo</groupId>
-            <artifactId>agent-spring-boot-starter</artifactId>
+            <artifactId>framework-ai</artifactId>
             <version>1.0.0</version>
         </dependency>
         <dependency>
@@ -41,11 +41,22 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-mail</artifactId>
         </dependency>
-
-        <!-- 数学表达式求值 -->
         <dependency>
             <groupId>net.objecthunter</groupId>
             <artifactId>exp4j</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.zimo</groupId>
+            <artifactId>framework-autoconfig</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+            <optional>true</optional>
         </dependency>
     </dependencies>
 </project>

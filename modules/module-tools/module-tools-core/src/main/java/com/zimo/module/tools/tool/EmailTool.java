@@ -1,8 +1,8 @@
 package com.zimo.module.tools.tool;
 
-import com.zimo.starter.ai.skill.AiSkill;
+import com.zimo.framework.ai.skill.AiSkill;
 import cn.hutool.core.util.StrUtil;
-import com.zimo.starter.ai.skill.AiSkillResult;
+import com.zimo.framework.ai.skill.AiSkillResult;
 import com.zimo.module.tools.ToolsProperties;
 import jakarta.mail.internet.MimeMessage;
 import java.util.Map;

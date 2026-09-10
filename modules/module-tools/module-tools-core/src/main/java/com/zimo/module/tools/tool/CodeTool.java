@@ -1,11 +1,11 @@
 package com.zimo.module.tools.tool;
 
-import com.zimo.starter.ai.skill.AiSkill;
+import com.zimo.framework.ai.skill.AiSkill;
 import cn.hutool.core.util.StrUtil;
-import com.zimo.starter.ai.skill.AiSkillResult;
-import com.zimo.starter.ai.sandbox.SandboxBackend;
-import com.zimo.starter.ai.sandbox.SandboxCommand;
-import com.zimo.starter.ai.sandbox.SandboxResult;
+import com.zimo.framework.ai.skill.AiSkillResult;
+import com.zimo.framework.ai.sandbox.SandboxBackend;
+import com.zimo.framework.ai.sandbox.SandboxCommand;
+import com.zimo.framework.ai.sandbox.SandboxResult;
 import com.zimo.module.tools.ToolsProperties;
 import java.util.List;
 import java.util.Map;
@@ -111,8 +111,8 @@ public class CodeTool implements AiSkill {
 
     /** 无沙箱后端注入时退化为直接 ProcessBuilder（保留旧构造行为）。 */
     private SandboxResult localFallback(SandboxCommand command) {
-        com.zimo.starter.ai.sandbox.LocalSandboxBackend local =
-                new com.zimo.starter.ai.sandbox.LocalSandboxBackend(properties.getSandboxTimeoutSeconds());
+        com.zimo.framework.ai.sandbox.LocalSandboxBackend local =
+                new com.zimo.framework.ai.sandbox.LocalSandboxBackend(properties.getSandboxTimeoutSeconds());
         return local.execute(command);
     }
 

@@ -1,9 +1,9 @@
 package com.zimo.module.ai.management;
 
-import com.zimo.starter.ai.agent.AiAgentProfile;
-import com.zimo.starter.ai.agent.AiAgentProfileResolver;
-import com.zimo.starter.ai.channel.AiChannelAgentBinding;
-import com.zimo.starter.ai.channel.AiChannelMessage;
+import com.zimo.framework.ai.agent.AiAgentProfile;
+import com.zimo.framework.ai.agent.AiAgentProfileResolver;
+import com.zimo.framework.ai.channel.AiChannelAgentBinding;
+import com.zimo.framework.ai.channel.AiChannelMessage;
 import java.util.Objects;
 import java.util.Optional;
 

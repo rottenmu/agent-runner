@@ -2,8 +2,8 @@ package com.zimo.module.ai.observ;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.zimo.framework.common.validation.ValidationUtil;
-import com.zimo.starter.ai.observ.TraceCollector;
-import com.zimo.starter.ai.observ.TraceObserver;
+import com.zimo.framework.ai.observ.TraceCollector;
+import com.zimo.framework.ai.observ.TraceObserver;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;

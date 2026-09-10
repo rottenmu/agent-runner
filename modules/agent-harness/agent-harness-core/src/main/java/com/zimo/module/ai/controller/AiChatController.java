@@ -1,16 +1,16 @@
 package com.zimo.module.ai.controller;
 
-import com.zimo.starter.ai.AiAgentReply;
+import com.zimo.framework.ai.AiAgentReply;
 import com.zimo.framework.common.validation.ValidationUtil;
 import cn.hutool.core.util.StrUtil;
-import com.zimo.starter.ai.AiAgentService;
-import com.zimo.starter.ai.agent.AiAgentProfile;
-import com.zimo.starter.ai.agent.AiAgentRouteRequest;
+import com.zimo.framework.ai.AiAgentService;
+import com.zimo.framework.ai.agent.AiAgentProfile;
+import com.zimo.framework.ai.agent.AiAgentRouteRequest;
 import com.zimo.framework.common.ApiResponse;
 import com.zimo.framework.common.security.SecurityFacade;
-import com.zimo.starter.ai.intent.ConversationContext;
-import com.zimo.starter.ai.intent.IntentAwareSkillRouter;
-import com.zimo.starter.ai.intent.IntentRoutingDecision;
+import com.zimo.framework.ai.intent.ConversationContext;
+import com.zimo.framework.ai.intent.IntentAwareSkillRouter;
+import com.zimo.framework.ai.intent.IntentRoutingDecision;
 import com.zimo.intent.model.IntentParseResult;
 import com.zimo.intent.service.IntentRecognitionService;
 import com.zimo.module.ai.management.AiManagedAgent;

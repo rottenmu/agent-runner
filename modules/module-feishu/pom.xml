@@ -15,6 +15,5 @@
 
     <modules>
         <module>module-feishu-core</module>
-        <module>module-feishu-autoconfig</module>
     </modules>
 </project>

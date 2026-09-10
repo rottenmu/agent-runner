@@ -36,3 +36,6 @@ hs_err_pid*.log
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# agent-memory 为独立仓库（rottenmu/agent-memory），避免双重版本管理
+modules/agent-memory/

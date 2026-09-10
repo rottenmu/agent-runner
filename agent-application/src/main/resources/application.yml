@@ -52,7 +52,7 @@ feishu:
       enabled: true
     gateway:
       archive-enabled: true
-      archive-app-token: ${FEISHU_ARCHIVE_APP_TOKEN}
+      archive-app-token: ${FEISHU_ARCHIVE_APP_TOKEN:}
       archive-table-id: ${FEISHU_ARCHIVE_TABLE_ID:}
 
 ai:

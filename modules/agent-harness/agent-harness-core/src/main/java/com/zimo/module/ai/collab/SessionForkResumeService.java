@@ -2,10 +2,10 @@ package com.zimo.module.ai.collab;
 
 import com.zimo.module.ai.observ.SessionEventLog;
 import com.zimo.module.ai.observ.SessionEventLogService;
-import com.zimo.starter.ai.AiAgentReply;
-import com.zimo.starter.ai.AiAgentService;
-import com.zimo.starter.ai.agent.AiAgentProfile;
-import com.zimo.starter.ai.agent.AiAgentRouteRequest;
+import com.zimo.framework.ai.AiAgentReply;
+import com.zimo.framework.ai.AiAgentService;
+import com.zimo.framework.ai.agent.AiAgentProfile;
+import com.zimo.framework.ai.agent.AiAgentRouteRequest;
 import io.agentscope.core.message.Msg;
 import io.agentscope.core.message.MsgRole;
 import java.util.ArrayList;

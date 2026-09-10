@@ -1,7 +1,7 @@
 package com.zimo.module.ai.skill;
 
-import com.zimo.starter.ai.skill.AiSkill;
-import com.zimo.starter.ai.skill.AiSkillResult;
+import com.zimo.framework.ai.skill.AiSkill;
+import com.zimo.framework.ai.skill.AiSkillResult;
 import java.util.Map;
 
 public class AiPluginStatusSkill implements AiSkill {
