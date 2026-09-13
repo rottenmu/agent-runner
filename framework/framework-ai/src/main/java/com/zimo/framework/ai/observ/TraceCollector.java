@@ -59,7 +59,22 @@ public final class TraceCollector {
     /** 记录链路步骤。 */
     public static void step(String stepType, String name, String inputJson,
                             String outputJson, long latencyMs, String status) {
-        String traceId = CURRENT_TRACE.get();
+        stepFor(CURRENT_TRACE.get(), stepType, name, inputJson, outputJson, latencyMs, status);
+    }
+
+    /**
+     * 按显式 traceId 记录链路步骤（跨线程场景）。
+     *
+     * <p><b>为什么需要这个重载</b>：{@link #step} 从 {@link ThreadLocal} 取 traceId，
+     * 但 AgentScope 的模型调用/工具执行运行在 Reactor 调度线程上，
+     * {@code ThreadLocal} 在那个线程里是空的，于是 {@code step} 会直接 return——
+     * 这正是「链路里只有外层 intent/generation，中间全空白」的根因。
+     * 中间件从 {@code RuntimeContext} 拿到 traceId 后，用本方法跨线程写入。</p>
+     *
+     * @param traceId 链路 ID；为 {@code null} 时不记录（不伪造 ID）
+     */
+    public static void stepFor(String traceId, String stepType, String name, String inputJson,
+                               String outputJson, long latencyMs, String status) {
         if (traceId == null) {
             return;
         }

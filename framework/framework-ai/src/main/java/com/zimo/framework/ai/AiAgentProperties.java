@@ -78,6 +78,108 @@ public class AiAgentProperties {
     /** 互操作规则文件是否通过专用内存技能（interop_instructions）提供（默认 true）。 */
     private boolean interopInstructionSkill = true;
 
+    /* ---------------- 可观测（OpenTelemetry / trace 中间件） ---------------- */
+
+    /**
+     * AgentScope trace 中间件开关（默认 true）。
+     *
+     * <p>启用后每次 agent 执行会记录 agent / model_call / tool_call 三类中间步骤到自研链路，
+     * 补齐现有链路只有外层 intent/generation 的空白。关闭则完全不挂载中间件。</p>
+     */
+    private boolean traceMiddlewareEnabled = true;
+
+    /**
+     * OpenTelemetry OTLP 导出开关（默认 false）。
+     *
+     * <p>默认关闭：未配置时 {@code OtelTracingMiddleware} 会短路成 no-op（AgentScope 设计），
+     * 零开销。需要导出到 Jaeger/Langfuse 等后端时再开启，并配置
+     * {@code ai.agent.otel-endpoint} 或环境变量 {@code OTEL_EXPORTER_OTLP_ENDPOINT}。</p>
+     */
+    private boolean otelEnabled = false;
+
+    /** OTLP 导出端点；留空时回退到环境变量 {@code OTEL_EXPORTER_OTLP_ENDPOINT}。 */
+    private String otelEndpoint;
+
+    /**
+     * OTLP 导出鉴权头；留空时回退到环境变量 {@code OTEL_EXPORTER_OTLP_AUTHORIZATION}。
+     *
+     * <p>敏感值，格式为 {@code Basic <base64-credentials>}（Langfuse 等后端要求）。
+     * 禁止写入日志或业务响应。</p>
+     */
+    private String otelAuthorization;
+
+    /** 服务名（OTel resource attribute {@code service.name}，用于在追踪后端区分应用）。 */
+    private String otelServiceName = "agent-runner";
+
+    /** 获取 trace 中间件开关。 */
+    public boolean isTraceMiddlewareEnabled() {
+        return traceMiddlewareEnabled;
+    }
+
+    /** 设置 trace 中间件开关。 */
+    public void setTraceMiddlewareEnabled(boolean traceMiddlewareEnabled) {
+        this.traceMiddlewareEnabled = traceMiddlewareEnabled;
+    }
+
+    /** 获取 OTel 导出开关。 */
+    public boolean isOtelEnabled() {
+        return otelEnabled;
+    }
+
+    /** 设置 OTel 导出开关。 */
+    public void setOtelEnabled(boolean otelEnabled) {
+        this.otelEnabled = otelEnabled;
+    }
+
+    /**
+     * 获取 OTLP 端点：配置值优先，其次环境变量，最后回退本地默认。
+     *
+     * @return 非空 OTLP HTTP 端点
+     */
+    public String getOtelEndpoint() {
+        if (StrUtil.isNotBlank(otelEndpoint)) {
+            return otelEndpoint.trim();
+        }
+        String fromEnv = System.getenv("OTEL_EXPORTER_OTLP_ENDPOINT");
+        if (StrUtil.isNotBlank(fromEnv)) {
+            return fromEnv.trim();
+        }
+        return "http://localhost:4318/v1/traces";
+    }
+
+    /** 设置 OTLP 端点。 */
+    public void setOtelEndpoint(String otelEndpoint) {
+        this.otelEndpoint = otelEndpoint;
+    }
+
+    /**
+     * 获取 OTLP 鉴权头：配置值优先，其次环境变量；均未配置时返回 {@code null}。
+     *
+     * @return 鉴权头值（敏感），或 {@code null} 表示不附加
+     */
+    public String getOtelAuthorization() {
+        if (StrUtil.isNotBlank(otelAuthorization)) {
+            return otelAuthorization.trim();
+        }
+        String fromEnv = System.getenv("OTEL_EXPORTER_OTLP_AUTHORIZATION");
+        return StrUtil.isBlank(fromEnv) ? null : fromEnv.trim();
+    }
+
+    /** 设置 OTLP 鉴权头。 */
+    public void setOtelAuthorization(String otelAuthorization) {
+        this.otelAuthorization = otelAuthorization;
+    }
+
+    /** 获取 OTel 服务名。 */
+    public String getOtelServiceName() {
+        return StrUtil.isBlank(otelServiceName) ? "agent-runner" : otelServiceName.trim();
+    }
+
+    /** 设置 OTel 服务名。 */
+    public void setOtelServiceName(String otelServiceName) {
+        this.otelServiceName = otelServiceName;
+    }
+
     /**
      * 判断 AI 智能体运行能力是否启用。
      *

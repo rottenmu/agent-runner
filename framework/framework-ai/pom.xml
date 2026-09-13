@@ -59,6 +59,17 @@
             <version>${agentscope.version}</version>
         </dependency>
 
+        <!-- OpenTelemetry：OtelTracingMiddleware 需要 SDK + OTLP exporter 才能真正导出 span。
+             仅 opentelemetry-api 只会短路成 no-op（AgentScope 的设计），版本由根 pom 的 BOM 统一。 -->
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-sdk</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-exporter-otlp</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>

@@ -73,6 +73,10 @@ public class AiHarnessAgentFactory {
     private final AiAgentPresetRegistry presetRegistry;
     /** 外部 harness 子智能体 provider（dsh A8 meta-harness）；默认解析 agentConfig.externalHarness.tasks[]。 */
     private final com.zimo.framework.ai.interop.ExternalHarnessSubagentProvider externalHarnessProvider;
+    /** 自研链路桥接中间件（可空）：把 agent/model/tool hook 桥接到 TraceCollector。 */
+    private final com.zimo.framework.ai.observ.HarnessTraceMiddleware traceMiddleware;
+    /** 官方 OTel 中间件（可空）：产出 OTLP span 树。 */
+    private final io.agentscope.core.tracing.OtelTracingMiddleware otelMiddleware;
 
     /**
      * 创建 HarnessAgent 工厂（不带 JSON 解析器，agentConfig 将按空白处理）。
@@ -127,6 +131,8 @@ public class AiHarnessAgentFactory {
         this.pluginManager = null;
         this.presetRegistry = null;
         this.externalHarnessProvider = null;
+        this.traceMiddleware = null;
+        this.otelMiddleware = null;
     }
 
     /**
@@ -153,6 +159,8 @@ public class AiHarnessAgentFactory {
         this.pluginManager = null;
         this.presetRegistry = null;
         this.externalHarnessProvider = null;
+        this.traceMiddleware = null;
+        this.otelMiddleware = null;
     }
 
     /**
@@ -178,6 +186,8 @@ public class AiHarnessAgentFactory {
         this.pluginManager = null;
         this.presetRegistry = null;
         this.externalHarnessProvider = null;
+        this.traceMiddleware = null;
+        this.otelMiddleware = null;
     }
 
     /**
@@ -204,6 +214,8 @@ public class AiHarnessAgentFactory {
         this.pluginManager = pluginManager;
         this.presetRegistry = null;
         this.externalHarnessProvider = null;
+        this.traceMiddleware = null;
+        this.otelMiddleware = null;
     }
 
     /**
@@ -231,6 +243,8 @@ public class AiHarnessAgentFactory {
         this.pluginManager = pluginManager;
         this.presetRegistry = presetRegistry;
         this.externalHarnessProvider = null;
+        this.traceMiddleware = null;
+        this.otelMiddleware = null;
     }
 
     /**
@@ -259,6 +273,47 @@ public class AiHarnessAgentFactory {
         this.pluginManager = pluginManager;
         this.presetRegistry = presetRegistry;
         this.externalHarnessProvider = externalHarnessProvider;
+        this.traceMiddleware = null;
+        this.otelMiddleware = null;
+    }
+
+    /**
+     * 全量构造（追加可观测中间件）。
+     *
+     * <p>在上一版全量构造基础上追加 {@code traceMiddleware}：把 AgentScope 的
+     * agent / modelCall / acting 三处 hook 桥接到自研 {@code TraceCollector}，
+     * 补齐现有链路追踪缺失的推理、模型调用与工具执行节点。</p>
+     *
+     * @param traceMiddleware 自研链路桥接中间件（可空）；为空时链路仅记录外层 intent/generation
+     * @param otelMiddleware 官方 OTel 中间件（可空）；为空时不产出 OTLP span
+     */
+    public AiHarnessAgentFactory(
+            AiAgentProperties properties,
+            AiSkillRegistry skillRegistry,
+            FileStorageService storageService,
+            ObjectMapper objectMapper,
+            AiMemoryService memoryService,
+            List<ToolExecutionListener> toolListeners,
+            List<AiCapabilityProvider> capabilities,
+            com.zimo.framework.ai.plugin.DynamicPluginManager pluginManager,
+            AiAgentPresetRegistry presetRegistry,
+            com.zimo.framework.ai.interop.ExternalHarnessSubagentProvider externalHarnessProvider,
+            com.zimo.framework.ai.observ.HarnessTraceMiddleware traceMiddleware,
+            io.agentscope.core.tracing.OtelTracingMiddleware otelMiddleware) {
+        this.properties = Objects.requireNonNull(properties, "properties must not be null");
+        this.skillRegistry = Objects.requireNonNull(
+                skillRegistry,
+                "skillRegistry must not be null");
+        this.storageService = storageService;
+        this.objectMapper = objectMapper;
+        this.memoryService = memoryService;
+        this.toolListeners = toolListeners == null ? java.util.List.of() : toolListeners;
+        this.capabilities = capabilities == null ? java.util.List.of() : capabilities;
+        this.pluginManager = pluginManager;
+        this.presetRegistry = presetRegistry;
+        this.externalHarnessProvider = externalHarnessProvider;
+        this.traceMiddleware = traceMiddleware;
+        this.otelMiddleware = otelMiddleware;
     }
 
     /**
@@ -302,8 +357,35 @@ public class AiHarnessAgentFactory {
                 .workspace(workspace);
         applyCompaction(builder);
         applyRocksdbMemory(builder);
+        applyObservability(builder);
         applyTypeStrategy(builder, profile.agentType(), config, workspace, preset);
         return builder.build();
+    }
+
+    /**
+     * 挂载可观测中间件（自研链路桥接 + 官方 OTel span）。
+     *
+     * <p><b>为什么需要中间件</b>：Harness 的推理循环、模型调用与工具执行都发生在 Reactor
+     * 调度线程上，而 {@code AiAgentService} 用 {@code .block()} 把结果拉回受控线程，
+     * 导致 {@code TraceCollector} 的 ThreadLocal 在异步边界处失效——现有链路只剩外层
+     * intent/generation 两个点，中间的每轮推理、每次模型调用与工具执行全是空白。
+     * 中间件在 AgentScope 内部（同线程）触发，因此能拿到完整事件。</p>
+     *
+     * <p><b>两者互补</b>：{@code traceMiddleware} 把事件写回自研 {@code TraceCollector}
+     * （前端「可观测」页直接可用）；{@code otelMiddleware} 产出标准 OTLP span 树
+     * （对接 Jaeger/Tempo 等）。任一为空时对应通道静默关闭，互不影响。</p>
+     *
+     * @param builder HarnessAgent Builder
+     */
+    private void applyObservability(HarnessAgent.Builder builder) {
+        if (traceMiddleware != null) {
+            builder.middleware(traceMiddleware);
+            log.debug("[observ] 已挂载自研链路桥接中间件");
+        }
+        if (otelMiddleware != null) {
+            builder.middleware(otelMiddleware);
+            log.debug("[observ] 已挂载 OTel 追踪中间件");
+        }
     }
 
     /**

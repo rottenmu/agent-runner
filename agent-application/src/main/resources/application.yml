@@ -77,6 +77,17 @@ ai:
     memory-session-retention-days: 180
     memory-user-retention-days: 180
     memory-max-records-per-category: 200
+    # ---- 可观测性 ----
+    # trace 中间件：把 agent 内部的推理/模型调用/工具执行写入链路追踪（自研 TraceCollector）。
+    # 关闭后链路只剩外层 intent/generation 两个点。默认开启，无额外开销。
+    trace-middleware-enabled: true
+    # OTel 导出：产出标准 OTLP span 树（invoke_agent / chat / execute_tool 三级）。
+    # 默认关闭（no-op 零开销）。开启需后端有 OTLP 接收端（Jaeger/Tempo/Langfuse 等），
+    # 否则 batch processor 会持续重试并在关闭时打日志。
+    otel-enabled: false
+    # otel-endpoint: http://localhost:4318/v1/traces   # 或用环境变量 OTEL_EXPORTER_OTLP_ENDPOINT
+    # otel-authorization: ${OTEL_EXPORTER_OTLP_AUTHORIZATION}  # 敏感，Basic <base64>（Langfuse 等要求）
+    otel-service-name: agent-runner
 
 plugin:
   feishu:

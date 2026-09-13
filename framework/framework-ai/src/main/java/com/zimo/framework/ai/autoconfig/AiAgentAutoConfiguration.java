@@ -20,7 +20,7 @@ import com.zimo.framework.ai.chat.OpenAiCompatibleChatClient;
 import com.zimo.module.agentmemory.memory.AiMemoryService;
 import com.zimo.framework.ai.runtime.AiAgentRuntime;
 import com.zimo.framework.ai.runtime.AiAgentRuntimeFactory;
-import com.zimo.framework.ai.skill.AiSkill;
+import com.zimo.framework.common.skill.AiSkill;
 import com.zimo.framework.ai.skill.AiSkillRegistry;
 import com.zimo.framework.ai.skill.DefaultAiSkills;
 import com.zimo.framework.ai.skill.ToolApprovalHandler;
@@ -222,12 +222,72 @@ public class AiAgentAutoConfiguration {
             java.util.List<AiCapabilityProvider> capabilities,
             org.springframework.beans.factory.ObjectProvider<com.zimo.framework.ai.plugin.DynamicPluginManager> pluginManagerProvider,
             AiAgentPresetRegistry presetRegistry,
-            com.zimo.framework.ai.interop.ExternalHarnessSubagentProvider externalHarnessProvider) {
+            com.zimo.framework.ai.interop.ExternalHarnessSubagentProvider externalHarnessProvider,
+            // 可观测中间件均为可选：trace 中间件按 ai.agent.trace-middleware-enabled 决定是否注册；
+            // OTel 中间件按 ai.agent.otel-enabled 决定。两者缺失时对应通道静默关闭，不影响 agent 构建。
+            org.springframework.beans.factory.ObjectProvider<com.zimo.framework.ai.observ.HarnessTraceMiddleware> traceMiddlewareProvider,
+            org.springframework.beans.factory.ObjectProvider<io.agentscope.core.tracing.OtelTracingMiddleware> otelMiddlewareProvider) {
         FileStorageService storageService = storageServiceProvider.getIfAvailable();
         AiMemoryService memoryService = memoryServiceProvider.getIfAvailable();
         return new AiHarnessAgentFactory(properties, skillRegistry, storageService, objectMapper, memoryService,
                 toolListeners, capabilities, pluginManagerProvider.getIfAvailable(), presetRegistry,
-                externalHarnessProvider);
+                externalHarnessProvider,
+                traceMiddlewareProvider.getIfAvailable(),
+                otelMiddlewareProvider.getIfAvailable());
+    }
+
+    /**
+     * 自研链路桥接中间件：把 AgentScope 的 agent/modelCall/acting 三处 hook 写入 TraceCollector。
+     *
+     * <p>补齐现有链路缺失的推理、模型调用与工具执行节点。默认开启
+     * （{@code ai.agent.trace-middleware-enabled=true}）；关闭时不注册该 Bean，
+     * 工厂侧 {@code applyObservability} 自动跳过。</p>
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnProperty(
+            prefix = "ai.agent",
+            name = "trace-middleware-enabled",
+            havingValue = "true",
+            matchIfMissing = true)
+    public com.zimo.framework.ai.observ.HarnessTraceMiddleware harnessTraceMiddleware() {
+        return new com.zimo.framework.ai.observ.HarnessTraceMiddleware();
+    }
+
+    /**
+     * 官方 OTel 追踪中间件：产出 {@code invoke_agent}/{@code chat}/{@code execute_tool} 三级 span 树。
+     *
+     * <p>默认关闭（{@code ai.agent.otel-enabled=false}）：不注册时中间件视为 no-op，
+     * 零网络开销。开启后需配合 {@code OtelTracingInitializer} 注册 SDK 才能真正导出。</p>
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnProperty(
+            prefix = "ai.agent",
+            name = "otel-enabled",
+            havingValue = "true")
+    public io.agentscope.core.tracing.OtelTracingMiddleware otelTracingMiddleware() {
+        return new io.agentscope.core.tracing.OtelTracingMiddleware();
+    }
+
+    /**
+     * OpenTelemetry SDK 初始化器：为 OTel 中间件注册全局 TracerProvider 与 OTLP 导出器。
+     *
+     * <p>必须与其他 Bean 同生命周期：注册全局实例后由 Spring 关闭钩子刷新待导出 span，
+     * 否则进程退出时缓冲区里的 span 会全部丢失。</p>
+     */
+    @Bean(destroyMethod = "close")
+    @ConditionalOnMissingBean
+    @ConditionalOnProperty(
+            prefix = "ai.agent",
+            name = "otel-enabled",
+            havingValue = "true")
+    public com.zimo.framework.ai.observ.OtelTracingInitializer otelTracingInitializer(
+            AiAgentProperties properties) {
+        com.zimo.framework.ai.observ.OtelTracingInitializer initializer =
+                new com.zimo.framework.ai.observ.OtelTracingInitializer(properties);
+        initializer.initialize();
+        return initializer;
     }
 
     /** 动态插件管理器（data/plugins/*.jar，启动时自动扫描装载）。 */

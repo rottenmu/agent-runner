@@ -307,6 +307,11 @@ public class AiAgentService {
         try {
             String sessionKey = sessionKeyFactory.create(routeRequest, profile);
             RuntimeContext context2 = runtimeContext(routeRequest, sessionKey);
+            // 把 traceId 挂到 RuntimeContext：agent.call().block() 会把执行切到 Reactor
+            // 调度线程，TraceCollector 的 ThreadLocal 在异步边界处失效。中间件通过
+            // RuntimeContext 的 key-value 区取回 traceId，从而把推理/模型/工具事件
+            // 写回同一条链路（详见 HarnessTraceMiddleware）。
+            com.zimo.framework.ai.observ.HarnessTraceMiddleware.bindTraceId(context2, traceId);
             com.zimo.framework.ai.observ.TraceCollector.step("intent", "意图路由",
                     "{\"agentType\":\"" + safeJson(profile.agentType())
                             + "\",\"model\":\"" + safeJson(profile.modelName())
@@ -402,6 +407,11 @@ public class AiAgentService {
         try {
             String sessionKey = sessionKeyFactory.create(routeRequest, profile);
             RuntimeContext context2 = runtimeContext(routeRequest, sessionKey);
+            // 把 traceId 挂到 RuntimeContext：agent.call().block() 会把执行切到 Reactor
+            // 调度线程，TraceCollector 的 ThreadLocal 在异步边界处失效。中间件通过
+            // RuntimeContext 的 key-value 区取回 traceId，从而把推理/模型/工具事件
+            // 写回同一条链路（详见 HarnessTraceMiddleware）。
+            com.zimo.framework.ai.observ.HarnessTraceMiddleware.bindTraceId(context2, traceId);
             Msg requestMessage = userMessage(message, routeRequest.userId());
             com.zimo.framework.ai.observ.TraceCollector.step("intent", "意图路由",
                     "{\"agentType\":\"" + safeJson(profile.agentType()) + "\",\"model\":\"" + safeJson(profile.modelName()) + "\"}",
