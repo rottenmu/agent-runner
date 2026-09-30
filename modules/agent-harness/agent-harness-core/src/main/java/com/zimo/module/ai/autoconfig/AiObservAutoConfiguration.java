@@ -100,4 +100,8 @@ public class AiObservAutoConfiguration {
         return new ObservController(traceService, testRunnerService, alertService,
                 dashboardService, eventLogService);
     }
+
+    // 说明：会话 fork/resume/context 三接口由 AiCollabAutoConfiguration 装配的
+    // collab.SessionForkResumeController 提供（/api/biz/ai/observ/sessions/*），
+    // 此处不得重复注册同类接口 —— 曾因两套 controller 映射相同路径导致启动失败（Ambiguous mapping）。
 }

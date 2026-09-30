@@ -1,6 +1,10 @@
 package com.zimo.module.ai.autoconfig;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.zimo.framework.ai.intent.IntentAwareSkillRouter;
+import com.zimo.framework.common.security.SecurityFacade;
+import com.zimo.intent.service.IntentRecognitionService;
+import com.zimo.module.ai.controller.AiChatPreflight;
 import com.zimo.module.ai.management.AiAgentManagementService;
 import com.zimo.module.ai.management.AiManagedAgentContributor;
 import com.zimo.module.ai.management.AiManagedAgentProfileResolver;
@@ -17,6 +21,7 @@ import com.zimo.framework.ai.agent.AiHarnessAgentRegistry;
 import com.zimo.framework.ai.autoconfig.AiAgentAutoConfiguration;
 import com.zimo.framework.ai.skill.AiSkillRegistry;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -87,6 +92,31 @@ public class AiSkillAdminAutoConfiguration {
     @ConditionalOnBean(AiAgentManagementService.class)
     public AiManagedAgentProfileResolver aiManagedAgentProfileResolver(AiAgentManagementService service) {
         return new AiManagedAgentProfileResolver(service);
+    }
+
+    /**
+     * 注册对话前置闸门：同步与流式两条对话通道共用同一份校验实现。
+     *
+     * <p>本模块只扫描 {@code controller} 子包，{@code @Component} 不会被拾取，
+     * 因此必须在此显式注册 —— 否则 {@code AiChatController} 因缺依赖而注册失败，
+     * 表现是「对话接口整个 404」，与本次改动毫无表面关联，极难定位。</p>
+     *
+     * <p>安全 / 意图 / 技能路由三个协作者用 {@code ObjectProvider} 软获取：
+     * 它们分别来自可裁剪的模块，硬依赖会让 {@code plugin.ai} 单独启用时启动失败。</p>
+     */
+    @Bean
+    @ConditionalOnBean(AiAgentManagementService.class)
+    @ConditionalOnMissingBean
+    public AiChatPreflight aiChatPreflight(
+            AiAgentManagementService agentManagement,
+            ObjectProvider<SecurityFacade> security,
+            ObjectProvider<IntentRecognitionService> intentService,
+            ObjectProvider<IntentAwareSkillRouter> skillRouter) {
+        return new AiChatPreflight(
+                agentManagement,
+                Optional.ofNullable(security.getIfAvailable()),
+                Optional.ofNullable(intentService.getIfAvailable()),
+                Optional.ofNullable(skillRouter.getIfAvailable()));
     }
 
     /**

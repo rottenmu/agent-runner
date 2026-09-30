@@ -7,3 +7,4 @@ com.zimo.module.ai.autoconfig.AiSkillCoreAutoConfiguration
 com.zimo.module.ai.autoconfig.AiWorkflowAutoConfiguration
 com.zimo.module.ai.autoconfig.AiCollabAutoConfiguration
 com.zimo.module.ai.autoconfig.AiObservAutoConfiguration
+com.zimo.module.ai.autoconfig.AiChatMemoryAutoConfiguration

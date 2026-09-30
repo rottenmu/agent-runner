@@ -94,6 +94,17 @@ public class AiMcpConfigController {
         return ApiResponse.ok();
     }
 
+    /**
+     * 测试 MCP 连接（轻量 initialize 握手探测）。
+     *
+     * @param id 配置 ID
+     * @return "OK: …" / "FAIL: …" 单行摘要（与数据源测试同风格）
+     */
+    @PostMapping("/{id}/test")
+    public ApiResponse<String> test(@PathVariable Long id) {
+        return ApiResponse.ok(mcpConfigService.test(id));
+    }
+
     private void validate(AiMcpConfig config) {
         if (config == null || !StringUtils.hasText(config.getName())) {
             throw new IllegalArgumentException("MCP 名称不能为空");

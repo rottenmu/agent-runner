@@ -97,8 +97,8 @@ public class AiSkillCoreAutoConfiguration {
     
     @Bean
     @ConditionalOnMissingBean
-    public AiMcpConfigService aiMcpConfigService() {
-        return new AiMcpConfigServiceImpl();
+    public AiMcpConfigService aiMcpConfigService(ObjectMapper objectMapper) {
+        return new AiMcpConfigServiceImpl(objectMapper);
     }
 
 
