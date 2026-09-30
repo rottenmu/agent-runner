@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.zimo</groupId>
+        <artifactId>agent-datasource</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>module-datasource-storage</artifactId>
+    <name>module-datasource-storage</name>
+    <description>通用存储 SPI 骨架：装配上下文、引擎插拔接口与路由（零业务依赖，供各模块复用）</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+    </dependencies>
+</project>

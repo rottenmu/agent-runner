@@ -6,7 +6,7 @@ import com.zimo.module.feishu.cli.FeishuCliPolicy;
 import com.zimo.module.feishu.cli.FeishuCliTemplate;
 import com.zimo.module.feishu.cli.bitable.FeishuBitableCliService;
 import com.zimo.module.feishu.cli.document.FeishuDocumentCliService;
-import com.zimo.framework.ai.skill.AiSkillResult;
+import com.zimo.framework.common.skill.AiSkillResult;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 

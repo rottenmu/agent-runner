@@ -1,6 +1,6 @@
 package com.zimo.framework.ai.intent;
 
-import com.zimo.framework.ai.skill.AiSkill;
+import com.zimo.framework.common.skill.AiSkill;
 import java.util.List;
 
 /**

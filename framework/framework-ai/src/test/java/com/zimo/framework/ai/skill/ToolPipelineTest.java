@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
+import com.zimo.framework.common.skill.AiSkillResult;
 
 /**
  * ToolPipeline 单元测试：pre hook / guard / HITL 审批 / 重试 / post hook / 打点短路。

@@ -12,8 +12,8 @@ import lombok.Data;
 /**
  * 智能体设置项。
  *
- * <p>以 key-value 形式持久化智能体运行配置（如长期记忆参数），key 对应
- * {@code ai.agent.*} 配置项，value 为覆盖值；未配置的项由默认值补齐。</p>
+ * <p>以 key-value 形式持久化智能体运行配置（如短期与长期记忆参数），value 为覆盖值；
+ * 未配置的预设项由默认值补齐。</p>
  *
  * @author WorkBuddy
  * @since 2026-08-08
@@ -25,7 +25,7 @@ public class AgentSetting {
     @TableId(type = IdType.AUTO)
     private Long id;
 
-    /** 配置键，如 memory-enabled */
+    /** 配置键，如 memory-enabled 或 short-term-retention-days。 */
     private String configKey;
 
     /** 配置值，字符串形式 */

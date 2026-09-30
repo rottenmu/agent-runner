@@ -77,6 +77,19 @@ public class AiHarnessAgentFactory {
     private final com.zimo.framework.ai.observ.HarnessTraceMiddleware traceMiddleware;
     /** 官方 OTel 中间件（可空）：产出 OTLP span 树。 */
     private final io.agentscope.core.tracing.OtelTracingMiddleware otelMiddleware;
+    /**
+     * 记忆预召回注入中间件（可空）：把长期记忆追加到系统提示词（M3，PRD §3.3）。
+     *
+     * <p>为空时记忆注入通道整体关闭，其余能力不受影响。</p>
+     */
+    private final com.zimo.framework.ai.memory.MemoryPromptMiddleware memoryMiddleware;
+    /**
+     * HITL 确认信号中间件（可空）：采集「用户是否驳回了确认」，供计划模式回写守卫用（M4-2b）。
+     *
+     * <p>为空时驳回信号始终读不到，回写守卫退化为默认 {@code false}（未驳回即回写），
+     * 与 PRD「未驳回即回写」的兜底语义一致 —— 只是失去了负向保护。</p>
+     */
+    private final com.zimo.framework.ai.observ.HitlConfirmSignalMiddleware hitlMiddleware;
 
     /**
      * 创建 HarnessAgent 工厂（不带 JSON 解析器，agentConfig 将按空白处理）。
@@ -133,6 +146,8 @@ public class AiHarnessAgentFactory {
         this.externalHarnessProvider = null;
         this.traceMiddleware = null;
         this.otelMiddleware = null;
+        this.memoryMiddleware = null;
+        this.hitlMiddleware = null;
     }
 
     /**
@@ -161,6 +176,8 @@ public class AiHarnessAgentFactory {
         this.externalHarnessProvider = null;
         this.traceMiddleware = null;
         this.otelMiddleware = null;
+        this.memoryMiddleware = null;
+        this.hitlMiddleware = null;
     }
 
     /**
@@ -188,6 +205,8 @@ public class AiHarnessAgentFactory {
         this.externalHarnessProvider = null;
         this.traceMiddleware = null;
         this.otelMiddleware = null;
+        this.memoryMiddleware = null;
+        this.hitlMiddleware = null;
     }
 
     /**
@@ -216,6 +235,8 @@ public class AiHarnessAgentFactory {
         this.externalHarnessProvider = null;
         this.traceMiddleware = null;
         this.otelMiddleware = null;
+        this.memoryMiddleware = null;
+        this.hitlMiddleware = null;
     }
 
     /**
@@ -245,6 +266,8 @@ public class AiHarnessAgentFactory {
         this.externalHarnessProvider = null;
         this.traceMiddleware = null;
         this.otelMiddleware = null;
+        this.memoryMiddleware = null;
+        this.hitlMiddleware = null;
     }
 
     /**
@@ -275,6 +298,8 @@ public class AiHarnessAgentFactory {
         this.externalHarnessProvider = externalHarnessProvider;
         this.traceMiddleware = null;
         this.otelMiddleware = null;
+        this.memoryMiddleware = null;
+        this.hitlMiddleware = null;
     }
 
     /**
@@ -300,6 +325,65 @@ public class AiHarnessAgentFactory {
             com.zimo.framework.ai.interop.ExternalHarnessSubagentProvider externalHarnessProvider,
             com.zimo.framework.ai.observ.HarnessTraceMiddleware traceMiddleware,
             io.agentscope.core.tracing.OtelTracingMiddleware otelMiddleware) {
+        this(properties, skillRegistry, storageService, objectMapper, memoryService, toolListeners,
+                capabilities, pluginManager, presetRegistry, externalHarnessProvider,
+                traceMiddleware, otelMiddleware, null);
+    }
+
+    /**
+     * 全量构造（追加记忆注入中间件，M3）。
+     *
+     * <p>与上一版唯一差异是多收一个 {@code memoryMiddleware}。它负责把预召回的长期记忆
+     * 追加到<b>系统提示词</b> —— 之所以不往 messages 里塞 SYSTEM 消息，是因为 AgentScope
+     * 会直接拒绝（真机上表现为「每条命中记忆的对话都失败」），详见
+     * {@code MemoryPromptMiddleware} 的类注释。</p>
+     *
+     * @param memoryMiddleware 记忆注入中间件（可空）；为空时记忆不注入，召回/回写埋点也不发生
+     */
+    public AiHarnessAgentFactory(
+            AiAgentProperties properties,
+            AiSkillRegistry skillRegistry,
+            FileStorageService storageService,
+            ObjectMapper objectMapper,
+            AiMemoryService memoryService,
+            List<ToolExecutionListener> toolListeners,
+            List<AiCapabilityProvider> capabilities,
+            com.zimo.framework.ai.plugin.DynamicPluginManager pluginManager,
+            AiAgentPresetRegistry presetRegistry,
+            com.zimo.framework.ai.interop.ExternalHarnessSubagentProvider externalHarnessProvider,
+            com.zimo.framework.ai.observ.HarnessTraceMiddleware traceMiddleware,
+            io.agentscope.core.tracing.OtelTracingMiddleware otelMiddleware,
+            com.zimo.framework.ai.memory.MemoryPromptMiddleware memoryMiddleware) {
+        this(properties, skillRegistry, storageService, objectMapper, memoryService, toolListeners,
+                capabilities, pluginManager, presetRegistry, externalHarnessProvider,
+                traceMiddleware, otelMiddleware, memoryMiddleware, null);
+    }
+
+    /**
+     * 全量构造（追加 HITL 确认信号中间件，M4-2b）。
+     *
+     * <p>与上一版唯一差异是多收一个 {@code hitlMiddleware}。计划模式执行完成后是否回写
+     * 程序性记忆，取决于「用户有没有驳回」——该信号只能从 AgentScope 的 HITL 事件流里取，
+     * 由 {@code HitlConfirmSignalMiddleware} 采集到 {@code RuntimeContext}。</p>
+     *
+     * @param hitlMiddleware HITL 确认信号中间件（可空）；为空时驳回守卫失效，
+     *                       回写退化为「一律回写」（兜底默认值）
+     */
+    public AiHarnessAgentFactory(
+            AiAgentProperties properties,
+            AiSkillRegistry skillRegistry,
+            FileStorageService storageService,
+            ObjectMapper objectMapper,
+            AiMemoryService memoryService,
+            List<ToolExecutionListener> toolListeners,
+            List<AiCapabilityProvider> capabilities,
+            com.zimo.framework.ai.plugin.DynamicPluginManager pluginManager,
+            AiAgentPresetRegistry presetRegistry,
+            com.zimo.framework.ai.interop.ExternalHarnessSubagentProvider externalHarnessProvider,
+            com.zimo.framework.ai.observ.HarnessTraceMiddleware traceMiddleware,
+            io.agentscope.core.tracing.OtelTracingMiddleware otelMiddleware,
+            com.zimo.framework.ai.memory.MemoryPromptMiddleware memoryMiddleware,
+            com.zimo.framework.ai.observ.HitlConfirmSignalMiddleware hitlMiddleware) {
         this.properties = Objects.requireNonNull(properties, "properties must not be null");
         this.skillRegistry = Objects.requireNonNull(
                 skillRegistry,
@@ -314,6 +398,8 @@ public class AiHarnessAgentFactory {
         this.externalHarnessProvider = externalHarnessProvider;
         this.traceMiddleware = traceMiddleware;
         this.otelMiddleware = otelMiddleware;
+        this.memoryMiddleware = memoryMiddleware;
+        this.hitlMiddleware = hitlMiddleware;
     }
 
     /**
@@ -385,6 +471,14 @@ public class AiHarnessAgentFactory {
         if (otelMiddleware != null) {
             builder.middleware(otelMiddleware);
             log.debug("[observ] 已挂载 OTel 追踪中间件");
+        }
+        if (memoryMiddleware != null) {
+            builder.middleware(memoryMiddleware);
+            log.debug("[observ] 已挂载记忆预召回注入中间件");
+        }
+        if (hitlMiddleware != null) {
+            builder.middleware(hitlMiddleware);
+            log.debug("[observ] 已挂载 HITL 确认信号中间件");
         }
     }
 
@@ -615,8 +709,16 @@ public class AiHarnessAgentFactory {
                     .stream(true)
                     .build();
         }
-        // 2.0.2 起 OpenAI 兼容模型统一走 DashScopeChatModel（dashscope 客户端即 OpenAI 兼容协议，
-        // baseUrl 可指向自建 vLLM/兼容服务）
+        // ⚠️ 两个分支都构造 DashScopeChatModel，且它走的是 DashScope **原生**协议 ——
+        // 不是 OpenAI 兼容协议。判据（非推测）：
+        //   1) 真机抓包：请求打到 `{baseUrl}/api/v1/services/aigc/text-generation/generation`，
+        //      请求体为原生结构 `{"model":..,"input":{"messages":..},"parameters":{..}}`，
+        //      并带 `X-DashScope-SSE: enable`；
+        //   2) 库字节码：agentscope-extensions-model-dashscope-2.0.2.jar 的 DashScopeHttpClient
+        //      内置默认 base 为 `https://dashscope.aliyuncs.com`，并自行拼接上述原生路径。
+        // 因此 `ai.agent.base-url` 不能配成 `/compatible-mode/v1`（会得到 404 且响应体为空）。
+        // 旧注释「dashscope 客户端即 OpenAI 兼容协议，baseUrl 可指向自建 vLLM」是错的，
+        // 极易把配置带偏 —— 保留更正说明以免后人再踩。
         return DashScopeChatModel.builder()
                 .apiKey(apiKey)
                 .baseUrl(properties.getBaseUrl())

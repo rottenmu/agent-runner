@@ -17,11 +17,18 @@ public class DsConnectorFactory {
 
     public DsConnectorFactory() {
         register(new DsConnectors.DatabaseConnector());
+        register(new DsConnectors.MysqlConnector());
+        register(new DsConnectors.MariadbConnector());
+        register(new DsConnectors.PostgreSqlConnector());
+        register(new DsConnectors.RedisConnector());
         register(new DsConnectors.DocumentConnector());
         register(new DsConnectors.OcrConnector());
         register(new DsConnectors.WebConnector());
         register(new DsConnectors.ApiConnector());
         register(new DsConnectors.FileServerConnector());
+        register(new DsConnectors.MinioConnector());
+        register(new DsConnectors.FtpConnector());
+        register(new DsConnectors.OssConnector());
         register(new DsConnectors.ErpConnector());
     }
 
@@ -46,12 +53,19 @@ public class DsConnectorFactory {
      */
     public List<Map<String, String>> types() {
         List<Map<String, String>> list = new ArrayList<>();
-        list.add(typeInfo("database", "数据库", "JDBC 连接，执行 SQL 查询"));
+        list.add(typeInfo("database", "数据库 · 通用 JDBC", "JDBC 连接，执行 SQL 查询"));
+        list.add(typeInfo("mysql", "MySQL", "MySQL 连接，执行 SQL 查询"));
+        list.add(typeInfo("mariadb", "MariaDB", "MariaDB 连接，执行 SQL 查询"));
+        list.add(typeInfo("postgresql", "PostgreSQL", "PostgreSQL 连接，执行 SQL 查询"));
+        list.add(typeInfo("redis", "Redis", "键值存储，PING/GET 键预览"));
         list.add(typeInfo("document", "Excel/Word/PDF", "解析文档为结构化文本与表格"));
         list.add(typeInfo("ocr", "扫描件 OCR", "图片扫描件文字识别"));
         list.add(typeInfo("web", "网页", "抓取网页正文与表格"));
         list.add(typeInfo("api", "接口数据", "HTTP 接口返回 JSON 转表格"));
-        list.add(typeInfo("file_server", "文件服务器", "本地目录 / FTP 文件浏览"));
+        list.add(typeInfo("file_server", "文件服务器 · 本地/FTP", "本地目录 / FTP 文件浏览"));
+        list.add(typeInfo("minio", "MinIO", "S3 兼容对象存储，健康检查"));
+        list.add(typeInfo("ftp", "FTP", "FTP 文件服务器，目录浏览"));
+        list.add(typeInfo("oss", "阿里云 OSS", "对象存储 bucket，端点可达性检查"));
         list.add(typeInfo("erp", "ERP 数据表", "ERP 业务数据表查询"));
         return list;
     }

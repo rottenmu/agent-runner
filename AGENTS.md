@@ -96,10 +96,11 @@ agent_runner/
 - 不编辑 `target/`、`dist/` 等生成产物。
 - 环境配置按敏感信息处理。除非用户明确要求，不要把凭据从配置文件复制到文档、日志、提交信息或聊天回复中。
 - 用户已要求：本仓库以后生成或修改的 `.md` 文档默认使用中文；除非用户明确要求其他语言。
-- 用户已要求：后续涉及方案、架构、实施计划或较大改动时，优先先写入 `.md` 文档；必须等待用户审核确认文档后，再按该文档进入执行阶段。
+- 用户已要求：后续涉及方案、架构、实施计划或较大改动时，优先先写入 `.md` 文档（方案类放 `docs/plans/YYYY-MM-DD-<topic>.md`，纯重构放 `docs/refactor/`）；必须等待用户审核确认文档后，再按该文档进入执行阶段。
 - 用户已要求：本仓库禁止使用 SQLite、H2 等本地数据库；运行、开发、验证和新增数据结构只能面向 MySQL。**唯一例外**：`module-agent-memory` 的智能体四层记忆（L0~L3）与 OLAP 离线分析，经用户 2026-08-18 明确批准使用嵌入式 H2 MVStore（OLTP）+ Arrow/Calcite（OLAP，纯 Java 无 JNI）作为进程内记忆存储，禁止其他模块或用途复用该例外。
 - 后端 Java 代码注释必须遵守 `docs/rules/BACKEND_JAVA_COMMENT_RULES.md`。
 - 后端与通用代码行数规范必须遵守 `docs/rules/CODE_SIZE_RULES.md`。
+- 方案 / 计划类文档必须遵守 `docs/rules/PLAN_DOC_RULES.md`：从 `docs/plans/TEMPLATE.md` 复制骨架，成功标准必须是真机可判定的行为并带阈值，实施完成后回填「实施记录」（含与方案的偏差及原因）。
 - Service 层、Controller 层中所有需要注入 Bean 的类，均采用普通 public 构造器注入；不要使用字段注入、setter 注入或测试专用注入构造器。
 - Service 层、Controller 层 Bean 每个类只保留一个 public 构造器；测试需要控制时间、随机数等可变因素时，优先使用可覆写方法或独立 helper，不要新增第二个构造器。
 

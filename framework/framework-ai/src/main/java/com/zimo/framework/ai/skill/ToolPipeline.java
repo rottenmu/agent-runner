@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
+import com.zimo.framework.common.skill.AiSkillResult;
 
 /**
  * 工具执行流水线（对齐 DeepSeek Harness tool pipeline）。

@@ -8,7 +8,7 @@ import com.zimo.framework.ai.agent.AiAgentProfile;
 import com.zimo.framework.ai.agent.AiAgentProfileResolver;
 import com.zimo.framework.ai.agent.AiAgentRouteRequest;
 import com.zimo.framework.ai.skill.AiSkillRegistry;
-import com.zimo.framework.ai.skill.AiSkillResult;
+import com.zimo.framework.common.skill.AiSkillResult;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;

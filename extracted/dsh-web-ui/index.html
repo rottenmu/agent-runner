@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Runner — 对话</title>
+<!--
+  页面 + 样式的独立抽取版（deepseek-harness，MIT）。
+  只含页面结构与样式，不含任何后端交互、RPC、状态管理或数据层。
+  页面内唯一脚本是浏览器演示所必需的展示态切换：
+  深色主题、侧栏折叠、右栏开合、页签、工具行展开、草稿是否为空。
+  所有几何与色值来自真实令牌与组件样式，溯源见 README.md。
+-->
+<link rel="stylesheet" href="styles/dsw-tokens.css">
+<link rel="stylesheet" href="styles/dsw-page.css">
+</head>
+<body>
+
+<!-- ===== 图标集（内联 sprite，全部走 currentColor 描边） ===== -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <!-- 品牌标记：一只鲸。源码的 hero 标记是同族造型，会缓慢摆尾。 -->
+    <symbol id="i-whale" viewBox="0 0 24 24">
+      <path d="M3 12.4c0-.6.5-1 1.1-1h3.2c.4 0 .8.2 1 .6l1 1.5c.5.7 1.3 1.1 2.2 1.1h1.4c2.9 0 5.3-2.3 5.3-5.2V8.2l2.6 1.5c.5.3.8.8.8 1.4 0 4.9-4 8.9-8.9 8.9h-2.6C5.6 20 3 17.4 3 14.2z"
+            fill="currentColor" stroke="none"/>
+      <circle cx="8.4" cy="13.6" r=".95" fill="var(--dsw-alias-bg-base)" stroke="none"/>
+    </symbol>
+    <symbol id="i-panel" viewBox="0 0 16 16">
+      <rect x="1.75" y="2.75" width="12.5" height="10.5" rx="2.5"/>
+      <path d="M6.25 2.75v10.5"/>
+    </symbol>
+    <symbol id="i-plus" viewBox="0 0 16 16">
+      <path d="M8 3.5v9M3.5 8h9"/>
+    </symbol>
+    <symbol id="i-chat" viewBox="0 0 16 16">
+      <path d="M13.5 7.6c0 2.7-2.5 4.9-5.5 4.9-.7 0-1.3-.1-1.9-.3l-2.8 1.1.9-2.5c-.8-.8-1.2-1.9-1.2-3.2 0-2.7 2.5-4.9 5.5-4.9s5 2.2 5 4.9z"/>
+    </symbol>
+    <symbol id="i-trajectory" viewBox="0 0 16 16">
+      <path d="M2.5 12.5h2.2l2-4.5 2.3 7 2.2-8.5 1.6 3h1.7"/>
+      <circle cx="12.6" cy="9.5" r="1.1"/>
+    </symbol>
+    <symbol id="i-settings" viewBox="0 0 16 16">
+      <circle cx="8" cy="8" r="2.1"/>
+      <path d="M8 1.9v1.6M8 12.5v1.6M14.1 8h-1.6M3.5 8H1.9M12.3 3.7l-1.1 1.1M4.8 11.2l-1.1 1.1M12.3 12.3l-1.1-1.1M4.8 4.8 3.7 3.7"/>
+    </symbol>
+    <symbol id="i-files" viewBox="0 0 16 16">
+      <path d="M2.75 3.5c0-.6.5-1.1 1.1-1.1h2.6l1.4 1.6h4.4c.6 0 1.1.5 1.1 1.1v6.4c0 .6-.5 1.1-1.1 1.1H3.85c-.6 0-1.1-.5-1.1-1.1z"/>
+    </symbol>
+    <symbol id="i-doc" viewBox="0 0 16 16">
+      <path d="M3.5 2.9c0-.6.5-1.1 1.1-1.1h4.2l3.7 3.6v7.7c0 .6-.5 1.1-1.1 1.1H4.6c-.6 0-1.1-.5-1.1-1.1z"/>
+      <path d="M8.6 1.9v3.5h3.6M5.6 8.6h4.8M5.6 11h3.4"/>
+    </symbol>
+    <symbol id="i-chevron-down" viewBox="0 0 16 16">
+      <path d="M4 6.25 8 10.25l4-4"/>
+    </symbol>
+    <symbol id="i-chevron-right" viewBox="0 0 16 16">
+      <path d="M6.25 4 10.25 8l-4 4"/>
+    </symbol>
+    <symbol id="i-search" viewBox="0 0 16 16">
+      <circle cx="7.2" cy="7.2" r="4.2"/>
+      <path d="M10.4 10.4 13.5 13.5"/>
+    </symbol>
+    <symbol id="i-more" viewBox="0 0 16 16">
+      <circle cx="3.4" cy="8" r=".95" fill="currentColor" stroke="none"/>
+      <circle cx="8" cy="8" r=".95" fill="currentColor" stroke="none"/>
+      <circle cx="12.6" cy="8" r=".95" fill="currentColor" stroke="none"/>
+    </symbol>
+    <symbol id="i-send" viewBox="0 0 16 16">
+      <path d="M8 12.5V3.6M4.2 7.2 8 3.4l3.8 3.8"/>
+    </symbol>
+    <symbol id="i-copy" viewBox="0 0 16 16">
+      <rect x="5.6" y="5.6" width="7.9" height="7.9" rx="2"/>
+      <path d="M10.4 3.6c0-.6-.5-1.1-1.1-1.1H3.6c-.6 0-1.1.5-1.1 1.1v5.7c0 .6.5 1.1 1.1 1.1"/>
+    </symbol>
+    <symbol id="i-up" viewBox="0 0 16 16">
+      <path d="M4.6 10.6V6.9c0-1.9 1.5-3.4 3.4-3.4s3.4 1.5 3.4 3.4v3.7"/>
+      <path d="M3 10.2h10v2.6H3z" rx="1"/>
+    </symbol>
+    <symbol id="i-down" viewBox="0 0 16 16">
+      <path d="M4.6 5.4v3.7c0 1.9 1.5 3.4 3.4 3.4s3.4-1.5 3.4-3.4V5.4"/>
+      <path d="M3 3.2h10v2.6H3z" rx="1"/>
+    </symbol>
+    <symbol id="i-refresh" viewBox="0 0 16 16">
+      <path d="M13 8a5 5 0 1 1-1.6-3.7"/>
+      <path d="M13.4 2.6v2.9h-2.9"/>
+    </symbol>
+    <symbol id="i-brand" viewBox="0 0 16 16">
+      <path d="M13.9 1.9c.35 2.9-.2 9.3-4.1 11.1-1.7.8-3.6.10-4.5-.7l-.6 1.6H2.6l.5-1.75C2.4 11.4 2 10.15 2 8.6h1.9c0 1.3.35 2.3.9 2.9C6.15 10.1 7.3 5.9 9.55 4.15c1.4-1.1 3.3-.5 4.35-2.25z" fill="currentColor" stroke="none"/>
+    </symbol>
+    <symbol id="i-close" viewBox="0 0 16 16">
+      <path d="M4.2 4.2 11.8 11.8M11.8 4.2 4.2 11.8"/>
+    </symbol>
+  </defs>
+</svg>
+
+<!-- ===== 三栏外壳 ===== -->
+<div class="af-frame" id="frame">
+
+  <!-- ---------- 左栏：侧栏 ---------- -->
+  <div class="af-sidebar-col">
+    <aside class="sb-root" id="sidebar">
+
+      <!-- 品牌行：字标 + 折叠开关 -->
+      <div class="sb-logo-row">
+        <button class="sb-brand" type="button" title="新建会话（Ctrl+N）">
+          <span class="sb-brand-identity">
+            <span class="sb-brand-mark">
+              <svg class="ic" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-whale"/></svg>
+            </span>
+            <span class="sb-brand-name sb-wide">Agent Runner</span>
+            <span class="sb-build-version sb-wide">LOCAL</span>
+          </span>
+        </button>
+        <button class="sb-icon-button" type="button" id="toggleSidebar" title="折叠侧栏">
+          <svg class="ic" width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><use href="#i-panel"/></svg>
+        </button>
+      </div>
+
+      <!-- 新建会话 -->
+      <button class="sb-new-session" type="button" title="新建会话">
+        <svg class="ic" width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><use href="#i-plus"/></svg>
+        <span class="sb-wide">新建会话</span>
+      </button>
+
+      <!-- 面板导航：main 槽的三个面板（对话 / 轨迹 / 设置） -->
+      <nav class="sb-panel-list">
+        <button class="sb-panel-row" type="button" data-active title="对话">
+          <svg class="ic" width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><use href="#i-chat"/></svg>
+          <span class="sb-panel-title sb-wide">对话</span>
+        </button>
+        <button class="sb-panel-row" type="button" title="轨迹">
+          <svg class="ic" width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><use href="#i-trajectory"/></svg>
+          <span class="sb-panel-title sb-wide">轨迹</span>
+        </button>
+        <button class="sb-panel-row" type="button" title="设置">
+          <svg class="ic" width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><use href="#i-settings"/></svg>
+          <span class="sb-panel-title sb-wide">设置</span>
+        </button>
+      </nav>
+
+      <!-- 会话区：按工作区分组的多级树 -->
+      <div class="sb-region">
+        <div class="sb-group-label sb-wide">
+          <svg class="ic" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><use href="#i-chevron-down"/></svg>
+          agent_runner
+        </div>
+        <div class="sb-list">
+
+          <button class="sb-session" type="button" data-active data-state="idle">
+            <span class="sb-session-head">
+              <span class="sb-session-title">登录态丢失定位与修复</span>
+              <span class="sb-dot"></span>
+            </span>
+            <span class="sb-session-preview">写入与读取落在两个不同的 Storage，且键名不一致</span>
+          </button>
+
+          <button class="sb-session" type="button" data-state="running">
+            <span class="sb-session-head">
+              <span class="sb-session-title">插件装载路径重构</span>
+              <span class="sb-dot"></span>
+            </span>
+            <span class="sb-session-preview">先枚举当前所有装载入口，再统一到一处</span>
+          </button>
+
+          <button class="sb-session" type="button" data-state="failed">
+            <span class="sb-session-head">
+              <span class="sb-session-title">时间排序校验</span>
+              <span class="sb-dot"></span>
+            </span>
+            <span class="sb-session-preview">断言未通过：expected ts[1] &gt;= ts[0]</span>
+          </button>
+
+          <button class="sb-session" type="button" data-state="idle">
+            <span class="sb-session-head">
+              <span class="sb-session-title">长链路回归（120 轮工具调用）</span>
+              <span class="sb-dot"></span>
+            </span>
+            <span class="sb-session-preview">共 120 轮，无失败</span>
+          </button>
+
+          <button class="sb-session" type="button" data-state="idle">
+            <span class="sb-session-head">
+              <span class="sb-session-title">observ 接口鉴权白名单</span>
+              <span class="sb-dot"></span>
+            </span>
+            <span class="sb-session-preview">帮我看下 observ 接口的鉴权白名单</span>
+          </button>
+
+        </div>
+      </div>
+
+      <!-- 底部署位：设置 + 主题（主题开关是这一页的演示开关，源码里在设置面板） -->
+      <div class="sb-foot">
+        <button class="sb-panel-row" type="button" id="toggleTheme" title="切换深浅主题">
+          <svg class="ic" width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><use href="#i-brand"/></svg>
+          <span class="sb-panel-title sb-wide">外观</span>
+        </button>
+        <button class="sb-panel-row" type="button" title="设置">
+          <svg class="ic" width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><use href="#i-settings"/></svg>
+          <span class="sb-panel-title sb-wide">设置</span>
+        </button>
+      </div>
+
+    </aside>
+  </div>
+
+  <!-- ---------- 中栏：会话 ---------- -->
+  <div class="af-center-col">
+    <div class="cv-root">
+
+      <!-- 头部：76px，与右栏页签条 + 面板头的两条水平线在列边缘对齐 -->
+      <header class="cv-header">
+        <div class="cv-title-row">
+          <div class="cv-title-cluster">
+            <div class="cv-crumbs">
+              <button class="cv-crumb" type="button">agent_runner</button>
+              <span class="cv-crumb-sep">/</span>
+              <button class="cv-crumb" type="button" data-current>登录态丢失定位与修复</button>
+            </div>
+          </div>
+          <div class="cv-header-actions">
+            <button class="sb-icon-button" type="button" title="搜索会话">
+              <svg class="ic" width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><use href="#i-search"/></svg>
+            </button>
+            <button class="sb-icon-button" type="button" title="打开右栏" id="toggleRightbar">
+              <svg class="ic" width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><use href="#i-panel"/></svg>
+            </button>
+            <button class="sb-icon-button" type="button" title="更多">
+              <svg class="ic" width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><use href="#i-more"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- 页签：选中态走 business 蓝，2px 指示条压在头部分隔线上 -->
+        <div class="cv-tabs">
+          <button class="cv-tab" type="button" data-active data-tab="chat">对话</button>
+          <button class="cv-tab" type="button" data-tab="trajectory">轨迹</button>
+        </div>
+      </header>
+
+      <div class="cv-body">
+        <!-- 滚动口即 inline-size 查询容器 -->
+        <div class="cv-scroll ch-scroll" id="transcript">
+
+          <div class="ch-root" data-pane="chat">
+
+            <!-- 用户消息：右对齐、r22 气泡，宽度上限取内容轴的 70.2% -->
+            <div class="msg-user-row">
+              <div class="msg-user-stack">
+                <div class="msg-bubble">登录态老是丢，刷新页面就退出了。帮我看下哪里写错了。</div>
+              </div>
+            </div>
+
+            <!-- 助手消息：整栏叙述，块间距 16 -->
+            <article class="asst">
+              <div class="asst-body">
+                <p>定位到了：<strong>写入与读取落在两个不同的 Storage，且键名不一致</strong>。登录成功时写的是 <code>localStorage.session_token</code>，而路由守卫读的是 <code>sessionStorage.token</code> —— 同源的两个存储互不可见，刷新后读到的永远是空值。</p>
+                <p>改动只有两行：把读取端也指向 <code>localStorage</code>，并把键名收敛到一个常量。</p>
+                <div class="md-code">
+                  <div class="md-code-banner">
+                    <span class="md-code-lang">src/api/auth.js</span>
+                    <button class="msg-action" type="button" title="复制">
+                      <svg class="ic" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><use href="#i-copy"/></svg>
+                    </button>
+                  </div>
+                  <pre class="md-code-body"><code>// 键名收敛到一处，写读共用
+const TOKEN_KEY = 'dsh.session_token'
+
+export function saveToken(token) {
+  localStorage.setItem(TOKEN_KEY, token)   // 原为 localStorage.session_token
+}
+
+export function readToken() {
+  return localStorage.getItem(TOKEN_KEY)   // 原为 sessionStorage.token
+}</code></pre>
+                </div>
+                <p>顺带把守卫里的取用点也换成 <code>readToken()</code>，避免第三次出现字面键名。</p>
+              </div>
+              <div class="msg-actions">
+                <button class="msg-action" type="button" title="复制">
+                  <svg class="ic" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><use href="#i-copy"/></svg>
+                </button>
+                <button class="msg-action" type="button" title="有帮助">
+                  <svg class="ic" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><use href="#i-up"/></svg>
+                </button>
+                <button class="msg-action" type="button" title="没帮助">
+                  <svg class="ic" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><use href="#i-down"/></svg>
+                </button>
+                <button class="msg-action" type="button" title="重新生成">
+                  <svg class="ic" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><use href="#i-refresh"/></svg>
+                </button>
+              </div>
+            </article>
+
+            <!-- 轮次过程折叠行：33px + 底部发丝线，收起时 chevron 朝右 -->
+            <button class="tpn-root" type="button" data-open id="turnProcess">
+              <svg class="ic tpn-chevron" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><use href="#i-chevron-down"/></svg>
+              <span class="tpn-label">3 次工具调用 · 已思考 12 秒</span>
+            </button>
+
+            <div id="turnProcessBody">
+              <div class="tool-row">
+                <span class="tool-name">read_file</span>
+                <span class="tool-arg">src/api/auth.js</span>
+                <span class="tool-ms">42 ms</span>
+                <span class="tool-state"></span>
+              </div>
+              <div class="tool-row">
+                <span class="tool-name">grep</span>
+                <span class="tool-arg">session_token</span>
+                <span class="tool-ms">18 ms</span>
+                <span class="tool-state"></span>
+              </div>
+              <div class="tool-row">
+                <span class="tool-name">write_file</span>
+                <span class="tool-arg">src/api/auth.js</span>
+                <span class="tool-stat"><span class="add">+4</span> <span class="del">-4</span></span>
+                <span class="tool-ms">27 ms</span>
+                <span class="tool-state"></span>
+              </div>
+            </div>
+
+            <!-- 轮次状态行 -->
+            <div class="turn-status">
+              已编辑 1 个文件
+              <span class="turn-status-clock">用时 6.4s</span>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Composer 席位：粘底，顶部 36px 淡出带，正文从下面沉下去 -->
+        <div class="cv-composer-seat">
+          <!-- 统计条：两枚图标胶囊 -->
+          <div class="ib-stats" data-composer-stats>
+            <button class="ib-pill" type="button">
+              <svg class="ic" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><use href="#i-trajectory"/></svg>
+              2 轮 5 步
+            </button>
+            <button class="ib-pill" type="button">
+              <svg class="ic" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><use href="#i-refresh"/></svg>
+              缓存命中 68%
+            </button>
+          </div>
+
+          <div class="ib-root">
+            <div class="ib-card" id="composer">
+              <div class="ib-scroll">
+                <div class="ib-grow">
+                  <div class="ib-input" id="draft" contenteditable="true" role="textbox"
+                       data-placeholder="发消息或创建任务, / 调用指令, @ 文件或对话"></div>
+                </div>
+              </div>
+              <div class="ib-row">
+                <div class="ib-tools">
+                  <button class="ib-add" type="button" title="添加附件">
+                    <svg class="ic" width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><use href="#i-plus"/></svg>
+                  </button>
+                  <select class="ib-select" title="模式">
+                    <option>标准</option>
+                    <option>Plan</option>
+                    <option>只读</option>
+                  </select>
+                </div>
+                <div class="ib-trailing">
+                  <select class="ib-select" title="模型">
+                    <option>deepseek-v4</option>
+                    <option>deepseek-v4-flash</option>
+                  </select>
+                  <button class="ib-send" type="button" title="发送">
+                    <svg class="ic" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><use href="#i-send"/></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ---------- 右栏 ---------- -->
+  <div class="af-rightbar-col">
+    <aside class="rs-panel">
+      <div class="rs-tab-strip">
+        <button class="rs-tab" type="button" data-active data-rtab="files">
+          <svg class="ic" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><use href="#i-files"/></svg>
+          文件
+        </button>
+        <button class="rs-tab" type="button" data-rtab="doc">
+          <svg class="ic" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><use href="#i-doc"/></svg>
+          文档
+        </button>
+        <button class="sb-icon-button" type="button" style="margin-left:auto" id="closeRightbar" title="关闭右栏">
+          <svg class="ic" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><use href="#i-close"/></svg>
+        </button>
+      </div>
+
+      <!-- 文件页签：工作区文件树，带未提交改动标记 -->
+      <div class="rs-pane-body" data-rpane="files">
+        <div class="rs-pane-head">
+          <svg class="ic" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><use href="#i-chevron-down"/></svg>
+          agent_runner
+        </div>
+        <button class="rs-tree-row" type="button" data-dir style="padding-left:8px">
+          <svg class="ic" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><use href="#i-chevron-right"/></svg>
+          <svg class="ic" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><use href="#i-files"/></svg>
+          <span class="rs-tree-label">frontend</span>
+        </button>
+        <button class="rs-tree-row" type="button" data-dir style="padding-left:22px">
+          <svg class="ic" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><use href="#i-chevron-right"/></svg>
+          <svg class="ic" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><use href="#i-files"/></svg>
+          <span class="rs-tree-label">agent-harness-ui</span>
+        </button>
+        <button class="rs-tree-row" type="button" data-dir style="padding-left:36px">
+          <svg class="ic" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><use href="#i-chevron-down"/></svg>
+          <svg class="ic" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><use href="#i-files"/></svg>
+          <span class="rs-tree-label">src</span>
+        </button>
+        <button class="rs-tree-row" type="button" data-active style="padding-left:50px">
+          <svg class="ic" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><use href="#i-doc"/></svg>
+          <span class="rs-tree-label">api/auth.js</span>
+          <span class="rs-change"><span class="add">+4</span> <span class="del">-4</span></span>
+        </button>
+        <button class="rs-tree-row" type="button" style="padding-left:50px">
+          <svg class="ic" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><use href="#i-doc"/></svg>
+          <span class="rs-tree-label">composables/useSession.js</span>
+          <span class="rs-change"><span class="add">+18</span></span>
+        </button>
+        <button class="rs-tree-row" type="button" data-dir style="padding-left:8px">
+          <svg class="ic" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><use href="#i-chevron-right"/></svg>
+          <svg class="ic" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><use href="#i-files"/></svg>
+          <span class="rs-tree-label">modules</span>
+        </button>
+        <button class="rs-tree-row" type="button" style="padding-left:8px">
+          <svg class="ic" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><use href="#i-doc"/></svg>
+          <span class="rs-tree-label">README.md</span>
+        </button>
+      </div>
+
+      <!-- 文档页签：受限读文件后的预览 -->
+      <div class="rs-pane-body" data-rpane="doc" hidden>
+        <div class="rs-pane-head">
+          <svg class="ic" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><use href="#i-doc"/></svg>
+          src/api/auth.js
+        </div>
+        <div class="rs-diff">
+          <div class="rs-diff-hunk">@@ -1,7 +1,7 @@</div>
+          <div class="rs-diff-line" data-kind="ctx"><span class="rs-diff-sign"> </span><span>import { request } from './client.js'</span></div>
+          <div class="rs-diff-line" data-kind="del"><span class="rs-diff-sign">−</span><span>localStorage.setItem('session_token', token)</span></div>
+          <div class="rs-diff-line" data-kind="add"><span class="rs-diff-sign">+</span><span>// 键名收敛到一处，写读共用</span></div>
+          <div class="rs-diff-line" data-kind="add"><span class="rs-diff-sign">+</span><span>const TOKEN_KEY = 'dsh.session_token'</span></div>
+          <div class="rs-diff-line" data-kind="add"><span class="rs-diff-sign">+</span><span>localStorage.setItem(TOKEN_KEY, token)</span></div>
+          <div class="rs-diff-line" data-kind="ctx"><span class="rs-diff-sign"> </span><span>}</span></div>
+          <div class="rs-diff-line" data-kind="ctx"><span class="rs-diff-sign"> </span><span></span></div>
+          <div class="rs-diff-line" data-kind="del"><span class="rs-diff-sign">−</span><span>return sessionStorage.getItem('token')</span></div>
+          <div class="rs-diff-line" data-kind="add"><span class="rs-diff-sign">+</span><span>return localStorage.getItem(TOKEN_KEY)</span></div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+</div>
+
+<!--
+  仅有的脚本：展示态切换。没有任何请求、存储、状态管理或数据层。
+  它只做一件事 —— 把源码里由框架写在元素上的 data-* 属性，按同样的名字写上，
+  让 CSS 里原有的选择器保持原样。
+-->
+<script>
+(function () {
+  var frame = document.getElementById('frame')
+  var sidebar = document.getElementById('sidebar')
+
+  // 深色主题：源码的机制就是给 body 加 data-ds-dark-theme，令牌随之整体翻转
+  document.getElementById('toggleTheme').addEventListener('click', function () {
+    if (document.body.hasAttribute('data-ds-dark-theme')) {
+      document.body.removeAttribute('data-ds-dark-theme')
+    } else {
+      document.body.setAttribute('data-ds-dark-theme', '')
+    }
+  })
+
+  // 侧栏折叠：只切轨道宽度与 rail 布局，淡出由 CSS 承担
+  document.getElementById('toggleSidebar').addEventListener('click', function () {
+    var collapsed = sidebar.hasAttribute('data-collapsed')
+    if (collapsed) {
+      sidebar.removeAttribute('data-collapsed')
+      frame.removeAttribute('data-sidebar-collapsed')
+    } else {
+      sidebar.setAttribute('data-fading', '')
+      setTimeout(function () {
+        sidebar.setAttribute('data-collapsed', '')
+        sidebar.removeAttribute('data-fading')
+        frame.setAttribute('data-sidebar-collapsed', '')
+      }, 150)
+    }
+  })
+
+  // 右栏开合：右栏是轨道不是盒子，轨道归零即收起
+  document.getElementById('toggleRightbar').addEventListener('click', function () {
+    frame.removeAttribute('data-rightbar-collapsed')
+  })
+  document.getElementById('closeRightbar').addEventListener('click', function () {
+    frame.setAttribute('data-rightbar-collapsed', '')
+  })
+
+  // 中栏页签
+  var tabs = document.querySelectorAll('.cv-tab')
+  Array.prototype.forEach.call(tabs, function (tab) {
+    tab.addEventListener('click', function () {
+      Array.prototype.forEach.call(tabs, function (t) { t.removeAttribute('data-active') })
+      tab.setAttribute('data-active', '')
+    })
+  })
+
+  // 右栏页签
+  var rtabs = document.querySelectorAll('.rs-tab')
+  var rpanes = document.querySelectorAll('[data-rpane]')
+  Array.prototype.forEach.call(rtabs, function (tab) {
+    tab.addEventListener('click', function () {
+      Array.prototype.forEach.call(rtabs, function (t) { t.removeAttribute('data-active') })
+      tab.setAttribute('data-active', '')
+      Array.prototype.forEach.call(rpanes, function (p) {
+        p.hidden = p.getAttribute('data-rpane') !== tab.getAttribute('data-rtab')
+      })
+    })
+  })
+
+  // 轮次过程折叠
+  var tp = document.getElementById('turnProcess')
+  var tpBody = document.getElementById('turnProcessBody')
+  tp.addEventListener('click', function () {
+    var open = tp.hasAttribute('data-open')
+    if (open) { tp.removeAttribute('data-open'); tpBody.hidden = true }
+    else { tp.setAttribute('data-open', ''); tpBody.hidden = false }
+  })
+
+  // 草稿：空态时发送钮 0.4 透明度（源码里输入框是 contenteditable）
+  var draft = document.getElementById('draft')
+  var composer = document.getElementById('composer')
+  function syncEmpty() {
+    if (draft.textContent.trim() === '') composer.setAttribute('data-empty', '')
+    else composer.removeAttribute('data-empty')
+  }
+  draft.addEventListener('input', syncEmpty)
+  syncEmpty()
+})()
+</script>
+
+</body>
+</html>

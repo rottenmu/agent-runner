@@ -1,6 +1,6 @@
 package com.zimo.framework.ai.mcp;
 
-import com.zimo.framework.ai.skill.AiSkillResult;
+import com.zimo.framework.common.skill.AiSkillResult;
 import java.util.List;
 import java.util.Map;
 

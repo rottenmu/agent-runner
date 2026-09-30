@@ -8,7 +8,7 @@ import static org.mockito.Mockito.when;
 import com.zimo.framework.ai.sandbox.SandboxBackend;
 import com.zimo.framework.ai.sandbox.SandboxCommand;
 import com.zimo.framework.ai.sandbox.SandboxResult;
-import com.zimo.framework.ai.skill.AiSkillResult;
+import com.zimo.framework.common.skill.AiSkillResult;
 import com.zimo.framework.ai.skill.ToolCallContext;
 import java.util.List;
 import java.util.Map;

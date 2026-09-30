@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import com.zimo.framework.common.skill.AiSkill;
+import com.zimo.framework.common.skill.AiSkillResult;
 
 class AiSkillRegistryTest {
 

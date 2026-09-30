@@ -2,7 +2,7 @@ package com.zimo.framework.ai.agent;
 
 import com.zimo.framework.ai.skill.AiSkillDescriptor;
 import com.zimo.framework.ai.skill.AiSkillRegistry;
-import com.zimo.framework.ai.skill.AiSkillResult;
+import com.zimo.framework.common.skill.AiSkillResult;
 import io.agentscope.core.message.ToolResultBlock;
 import io.agentscope.core.tool.ToolBase;
 import io.agentscope.core.tool.ToolCallParam;

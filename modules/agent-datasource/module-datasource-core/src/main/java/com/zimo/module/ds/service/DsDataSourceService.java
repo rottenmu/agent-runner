@@ -58,6 +58,8 @@ public class DsDataSourceService {
         ds.setDescription(description);
         ds.setConfigJson(configJson == null ? "{}" : configJson);
         ds.setEnabled(true);
+        // createdBy 非空 = 用户自建（前端据此把 createdBy 为空的种子数据显示为「内置数据源」卡片）
+        ds.setCreatedBy("user");
         LocalDateTime now = LocalDateTime.now();
         ds.setCreatedAt(now);
         ds.setUpdatedAt(now);

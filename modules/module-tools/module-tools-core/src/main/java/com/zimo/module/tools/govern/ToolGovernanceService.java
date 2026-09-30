@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import cn.hutool.core.util.StrUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zimo.framework.ai.mcp.ToolBridge;
-import com.zimo.framework.ai.skill.AiSkillResult;
+import com.zimo.framework.common.skill.AiSkillResult;
 import com.zimo.framework.ai.skill.AiSkillRegistry;
 import com.zimo.framework.common.security.SecurityFacade;
 import com.zimo.module.tools.entity.ToolAgentPermission;

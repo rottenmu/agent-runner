@@ -2,7 +2,7 @@ package com.zimo.framework.ai.interop;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.zimo.framework.ai.skill.AiSkillResult;
+import com.zimo.framework.common.skill.AiSkillResult;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;

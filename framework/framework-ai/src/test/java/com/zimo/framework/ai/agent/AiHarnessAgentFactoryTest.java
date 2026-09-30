@@ -8,9 +8,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.zimo.framework.ai.AiAgentProperties;
-import com.zimo.framework.ai.skill.AiSkill;
+import com.zimo.framework.common.skill.AiSkill;
 import com.zimo.framework.ai.skill.AiSkillRegistry;
-import com.zimo.framework.ai.skill.AiSkillResult;
+import com.zimo.framework.common.skill.AiSkillResult;
 import io.agentscope.core.message.TextBlock;
 import io.agentscope.core.message.ToolResultBlock;
 import io.agentscope.extensions.model.dashscope.DashScopeChatModel;

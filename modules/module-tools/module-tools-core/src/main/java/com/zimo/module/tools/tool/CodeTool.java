@@ -1,8 +1,8 @@
 package com.zimo.module.tools.tool;
 
-import com.zimo.framework.ai.skill.AiSkill;
+import com.zimo.framework.common.skill.AiSkill;
 import cn.hutool.core.util.StrUtil;
-import com.zimo.framework.ai.skill.AiSkillResult;
+import com.zimo.framework.common.skill.AiSkillResult;
 import com.zimo.framework.ai.sandbox.SandboxBackend;
 import com.zimo.framework.ai.sandbox.SandboxCommand;
 import com.zimo.framework.ai.sandbox.SandboxResult;

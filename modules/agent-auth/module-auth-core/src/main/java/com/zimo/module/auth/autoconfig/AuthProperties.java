@@ -21,7 +21,8 @@ public class AuthProperties {
                 "/api/auth/login",
                 "/api/auth/register",
                 "/api/plugins",
-                // /api/agent-memory/mcp 为记忆 MCP 端点，由端点内自行校验 Bearer/裸 token
+                // /api/agent-memory/mcp 为记忆 MCP 端点：由 MemoryMcpAccessGuard 在端点内校验
+                // agent-memory.mcp-token（Bearer 或裸 token），未配置时仅放行回环来源
                 "/api/agent-memory/mcp",
                 "/api/channel/inbound",
                 "/api/channel/sdk.js",

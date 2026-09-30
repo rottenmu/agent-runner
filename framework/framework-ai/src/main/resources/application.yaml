@@ -4,8 +4,11 @@ ai:
     name: ${AI_AGENT_NAME:ai-agent}
     model-name: ${LLM_MODEL_NAME:qwen-plus}
     model-type: ${LLM_MODEL_TYPE:dashscope_chat}
-    base-url: ${LLM_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/v1}
-    api-key: ${DASHSCOPE_API_KEY:sk-ws-H.RYIHMPM.vgP9.MEUCIQDs_Bo3q8lfVU3CTHOybpArXqZxE7OswBz8FfwDfqTz5AIgFlMy1iOJbIWUA_DcFfoUhRQMPzwT5taN2wqiIuyI-mc}
+    base-url: ${LLM_BASE_URL:https://dashscope.aliyuncs.com}
+    # ⚠️ 不得在此填写明文 key。曾硬编码过一把 sk-ws-… 的真实凭据并提交进 git 历史，
+    #    属于凭据泄露。凭据统一由环境变量注入（agent-application 用 AI_API_KEY，
+    #    本模块 fallback 用 DASHSCOPE_API_KEY），默认留空。
+    api-key: ${DASHSCOPE_API_KEY:}
     temperature: ${LLM_TEMPERATURE:0.7}
     max-tokens: ${LLM_MAX_TOKENS:2000}
     max-iters: ${AGENT_MAX_ITERS:5}

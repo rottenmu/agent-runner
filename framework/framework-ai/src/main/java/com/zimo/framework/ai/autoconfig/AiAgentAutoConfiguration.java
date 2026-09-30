@@ -183,6 +183,21 @@ public class AiAgentAutoConfiguration {
         return new AiAgentRuntimeFactory();
     }
 
+    /**
+     * 模型凭据启动自检：把 401 从「聊天时才暴露」提前到「启动期就告警」。
+     *
+     * <p>2026-09-18：聊天页发送消息报 {@code HTTP 401 InvalidApiKey}，根因是
+     * 环境变量里的 key 失效；但该错误只在请求期出现，排查时极易误判成模型名或
+     * base-url 的问题。本 Bean 在 {@code ApplicationReadyEvent} 时做一次形状校验
+     * 与归因输出，不拦启动、不发真实请求。</p>
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public com.zimo.framework.ai.startup.AiCredentialHealthCheck aiCredentialHealthCheck(
+            AiAgentProperties properties) {
+        return new com.zimo.framework.ai.startup.AiCredentialHealthCheck(properties);
+    }
+
     /** 根据配置和技能注册表创建智能体运行时描述。 */
     @Bean
     @ConditionalOnMissingBean
@@ -226,14 +241,35 @@ public class AiAgentAutoConfiguration {
             // 可观测中间件均为可选：trace 中间件按 ai.agent.trace-middleware-enabled 决定是否注册；
             // OTel 中间件按 ai.agent.otel-enabled 决定。两者缺失时对应通道静默关闭，不影响 agent 构建。
             org.springframework.beans.factory.ObjectProvider<com.zimo.framework.ai.observ.HarnessTraceMiddleware> traceMiddlewareProvider,
-            org.springframework.beans.factory.ObjectProvider<io.agentscope.core.tracing.OtelTracingMiddleware> otelMiddlewareProvider) {
+            org.springframework.beans.factory.ObjectProvider<io.agentscope.core.tracing.OtelTracingMiddleware> otelMiddlewareProvider,
+            // 记忆注入中间件为可选：由 module-agent-memory 提供 MemoryAwarePromptBuilder 时才装配。
+            // 未引入该模块时下面的 @Bean 不注册，此处 getIfAvailable() 返回 null，工厂跳过挂载。
+            org.springframework.beans.factory.ObjectProvider<com.zimo.framework.ai.memory.MemoryPromptMiddleware> memoryMiddlewareProvider,
+            // HITL 确认信号中间件（M4-2b）：采集驳回信号，供计划模式回写守卫用。
+            org.springframework.beans.factory.ObjectProvider<com.zimo.framework.ai.observ.HitlConfirmSignalMiddleware> hitlMiddlewareProvider) {
         FileStorageService storageService = storageServiceProvider.getIfAvailable();
         AiMemoryService memoryService = memoryServiceProvider.getIfAvailable();
         return new AiHarnessAgentFactory(properties, skillRegistry, storageService, objectMapper, memoryService,
                 toolListeners, capabilities, pluginManagerProvider.getIfAvailable(), presetRegistry,
                 externalHarnessProvider,
                 traceMiddlewareProvider.getIfAvailable(),
-                otelMiddlewareProvider.getIfAvailable());
+                otelMiddlewareProvider.getIfAvailable(),
+                memoryMiddlewareProvider.getIfAvailable(),
+                hitlMiddlewareProvider.getIfAvailable());
+    }
+
+    /**
+     * 记忆预召回注入中间件（M3，PRD §3.3）：把本轮召回到的长期记忆追加到系统提示词。
+     *
+     * <p>仅在 {@code MemoryAwarePromptBuilder} 存在时装配 —— 即引入了 module-agent-memory
+     * 且启用了感知引擎。缺失时不注册，工厂侧自动跳过，记忆通道静默关闭。</p>
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public com.zimo.framework.ai.memory.MemoryPromptMiddleware memoryPromptMiddleware(
+            org.springframework.beans.factory.ObjectProvider<com.zimo.module.agentmemory.engine.MemoryAwarePromptBuilder> promptBuilderProvider) {
+        return new com.zimo.framework.ai.memory.MemoryPromptMiddleware(
+                promptBuilderProvider.getIfAvailable());
     }
 
     /**
@@ -252,6 +288,38 @@ public class AiAgentAutoConfiguration {
             matchIfMissing = true)
     public com.zimo.framework.ai.observ.HarnessTraceMiddleware harnessTraceMiddleware() {
         return new com.zimo.framework.ai.observ.HarnessTraceMiddleware();
+    }
+
+    /**
+     * HITL 确认信号中间件（M4-2b）：采集「用户是否驳回确认」，供计划模式回写守卫用。
+     *
+     * <p><b>为什么默认开启</b>：它只读事件、不改主流程，且开销可忽略；
+     * 关闭它不会报错，但计划模式的「驳回不回写」保护会静默失效
+     * （回写守卫退化为默认「未驳回」），属于难以察觉的降级，故不设开关。</p>
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public com.zimo.framework.ai.observ.HitlConfirmSignalMiddleware hitlConfirmSignalMiddleware() {
+        return new com.zimo.framework.ai.observ.HitlConfirmSignalMiddleware();
+    }
+
+    /**
+     * 记忆埋点出口（M3，PRD §8.3）：把记忆模块的 span 写进自研链路通道。
+     *
+     * <p><b>为什么必须由本模块提供</b>：{@code MemoryTraceSink} 定义在
+     * {@code agent-memory-core}，而它<b>不能</b>反向依赖 {@code framework-ai}
+     * （framework-ai 已依赖 agent-memory-core，反向即成 Maven 循环引用）。
+     * 于是记忆侧只声明接口，适配放在这里 —— 签名与
+     * {@link com.zimo.framework.ai.observ.TraceCollector#stepFor} 逐参对齐，
+     * 因此适配退化成一句方法引用，不含任何转换逻辑。</p>
+     *
+     * <p>缺这个 Bean 的后果不是「报错」而是<b>静默降级</b>：记忆动作只进审计表，
+     * 可观测面板里那条链路干干净净，看不出任何召回发生过。</p>
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public com.zimo.module.agentmemory.engine.MemoryTraceSink memoryTraceSink() {
+        return com.zimo.framework.ai.observ.TraceCollector::stepFor;
     }
 
     /**
@@ -389,7 +457,9 @@ public class AiAgentAutoConfiguration {
             org.springframework.beans.factory.ObjectProvider<com.zimo.framework.common.ai.event.AiEventPublisher> eventPublisherProvider,
             java.util.List<com.zimo.framework.ai.agent.AiRequestInterceptor> requestInterceptors,
             java.util.List<com.zimo.framework.ai.agent.AiAgentMiddleware> middlewares,
-            org.springframework.beans.factory.ObjectProvider<com.zimo.framework.ai.plugin.DynamicPluginManager> pluginManagerProvider) {
+            org.springframework.beans.factory.ObjectProvider<com.zimo.framework.ai.plugin.DynamicPluginManager> pluginManagerProvider,
+            org.springframework.beans.factory.ObjectProvider<com.zimo.module.agentmemory.engine.MemoryAwarePromptBuilder> memoryPromptProvider,
+            org.springframework.beans.factory.ObjectProvider<com.zimo.framework.ai.memory.PlanWritebackCoordinator> planWritebackProvider) {
         List<com.zimo.framework.ai.agent.AiAgentMiddleware> allMiddlewares =
                 new java.util.ArrayList<>(middlewares == null ? List.of() : middlewares);
         com.zimo.framework.ai.plugin.DynamicPluginManager pluginManager = pluginManagerProvider.getIfAvailable();
@@ -409,9 +479,54 @@ public class AiAgentAutoConfiguration {
                 eventPublisherProvider.getIfAvailable(),
                 requestInterceptors,
                 allMiddlewares,
-                pluginManager == null ? null : pluginManager.eventBus());
+                pluginManager == null ? null : pluginManager.eventBus(),
+                memoryPromptProvider.getIfAvailable(),
+                planWritebackProvider.getIfAvailable(),
+                agentStateTaskPartitionProbe(fileStorageProvider));
     }
 
+    /**
+     * 计划模式回写协调器（M4-2b）：驳回守卫 + 程序性经验回写。
+     *
+     * <p><b>为何用 ObjectProvider 而非直接注入</b>：{@code MemoryManager} 由
+     * module-agent-memory 提供，未引入该模块时本 Bean 不应注册 —— 否则
+     * framework-ai 会被迫强依赖记忆模块。缺失时工厂侧自动跳过，记忆通道静默关闭。</p>
+     *
+     * <p>步骤来源接自研链路通道（{@code TraceCollector}）：计划工具步骤在唯一 span 入口
+     * 已被顺手攒了一份，无需再引入第二套采集。</p>
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public com.zimo.framework.ai.memory.PlanWritebackCoordinator planWritebackCoordinator(
+            org.springframework.beans.factory.ObjectProvider<com.zimo.module.agentmemory.governance.MemoryManager> memoryManagerProvider) {
+        com.zimo.module.agentmemory.governance.MemoryManager memoryManager =
+                memoryManagerProvider.getIfAvailable();
+        if (memoryManager == null) {
+            return null;
+        }
+        return new com.zimo.framework.ai.memory.PlanWritebackCoordinator(
+                new com.zimo.module.agentmemory.engine.PlanExperienceWriter(memoryManager),
+                com.zimo.framework.ai.observ.TraceCollector::planStepsOf);
+    }
+
+    /**
+     * AgentState task 分区探针（M4-3，PRD 标准 10）：查询与清理会话里的计划任务清单。
+     *
+     * <p><b>为何用 ObjectProvider 而非直接注入</b>：探针依赖 {@code FileStorageService}，
+     * 而它只在启用 RocksDB 存储时才存在；缺失说明会话状态根本没落到 RocksDB，
+     * 此时 task 分区不可能存在，返回 {@code null} 让调用方静默跳过即可。</p>
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public com.zimo.framework.ai.agent.memory.AgentStateTaskPartitionProbe
+            agentStateTaskPartitionProbe(
+                    ObjectProvider<FileStorageService> storageServiceProvider) {
+        FileStorageService storageService = storageServiceProvider.getIfAvailable();
+        if (storageService == null) {
+            return null;
+        }
+        return new com.zimo.framework.ai.agent.memory.AgentStateTaskPartitionProbe(storageService);
+    }
     /** 创建渠道消息处理器，并按需使用业务模块提供的默认智能体解析器。 */
     @Bean
     @ConditionalOnMissingBean

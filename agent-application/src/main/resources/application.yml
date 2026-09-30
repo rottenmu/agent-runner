@@ -59,9 +59,19 @@ ai:
   agent:
     enabled: true
     name: ai-agent
-    model-name: qwen3.7-max
+    # ⚠️ 必须填 DashScope **实际存在**的模型名。原值 `qwen3.7-max` 并非有效模型：
+    # 真机探测返回 403 `AllocationQuota.FreeTierOnly`（免费额度下不存在该模型）。
+    # 鉴权发生在模型解析之前，所以这个错误只在 key 可用后才会显形 —— 之前被 404/401 掩盖了。
+    model-name: qwen-max
     model-type: dashscope_chat
-    base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
+    # ⚠️ 必须是 DashScope **原生**协议的 base，不能带 `/compatible-mode/v1`。
+    # DashScopeChatModel 走的是原生协议：客户端自行拼接
+    # `/api/v1/services/aigc/text-generation/generation`（已从 agentscope-extensions-model-dashscope-2.0.2.jar
+    # 的 DashScopeHttpClient.class 字节码确证，其内置默认 base 即 `https://dashscope.aliyuncs.com`）。
+    # 若 base 写成 `.../compatible-mode/v1`，最终 URL 会变成
+    # `.../compatible-mode/v1/api/v1/services/aigc/text-generation/generation` —— 该路径不存在，
+    # 表现为「所有对话返回 HTTP 404 且响应体为空」（本仓库 2026-08-23 起长期存在）。
+    base-url: https://dashscope.aliyuncs.com
     api-key: ${AI_API_KEY}
     temperature: 0.7
     max-tokens: 2000
@@ -88,6 +98,19 @@ ai:
     # otel-endpoint: http://localhost:4318/v1/traces   # 或用环境变量 OTEL_EXPORTER_OTLP_ENDPOINT
     # otel-authorization: ${OTEL_EXPORTER_OTLP_AUTHORIZATION}  # 敏感，Basic <base64>（Langfuse 等要求）
     otel-service-name: agent-runner
+
+  # ===== 每轮对话写入 agent-memory（经其 MCP 端点 /api/agent-memory/mcp）=====
+  # 见 ChatTurnMemoryRecorder：每轮问答记一条会话记忆（target=session）。
+  # 记录是**异步旁路**，失败只留 WARN 日志，不影响对话。
+  chat-recorder:
+    enabled: true
+    # url 留空 = 按 Web 容器**实际监听端口**推导（支持 SERVER__PORT 等覆盖）。
+    # 显式配置时才用它，例如指向另一台机器的记忆服务。
+    url: ""
+    # token 留空 = 回落 agent-memory.mcp-token。后端侧一旦配了令牌，准入就从
+    # 「回环放行」切换为「只认令牌」，本端漏配会稳定 401、记忆一条都写不进去。
+    token: ""
+    max-chars: 4000
 
 plugin:
   feishu:
@@ -157,3 +180,6 @@ agent-memory:
   sensitive-filtering: true
   oltp-engine: h2
   olap-engine: arrow
+  # 记忆 MCP 端点（/api/agent-memory/mcp）访问令牌，须与客户端 mcp.json 的
+  # Authorization: Bearer ${AGENT_MEMORY_TOKEN} 一致；留空则仅放行回环来源（本机可用、跨机拒绝）
+  mcp-token: ${AGENT_MEMORY_TOKEN:}

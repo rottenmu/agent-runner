@@ -9,6 +9,8 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.util.UriComponentsBuilder;
+import com.zimo.framework.common.skill.AiSkill;
+import com.zimo.framework.common.skill.AiSkillResult;
 
 /**
  * AI API 技能实现，将技能调用参数转发到配置的远程 HTTP API。

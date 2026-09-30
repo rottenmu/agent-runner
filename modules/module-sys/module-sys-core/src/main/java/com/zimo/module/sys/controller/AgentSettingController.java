@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * 智能体设置管理接口。
  *
- * <p>提供智能体运行配置（长期记忆参数等）的查询、保存，
+ * <p>提供智能体运行配置（短期与长期记忆参数等）的查询、保存，
  * 以及自定义配置项的创建、编辑、删除能力。</p>
  *
  * @author WorkBuddy

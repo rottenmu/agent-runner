@@ -1,8 +1,8 @@
 package com.zimo.module.tools.tool;
 
-import com.zimo.framework.ai.skill.AiSkill;
+import com.zimo.framework.common.skill.AiSkill;
 import cn.hutool.core.util.StrUtil;
-import com.zimo.framework.ai.skill.AiSkillResult;
+import com.zimo.framework.common.skill.AiSkillResult;
 import java.util.List;
 import java.util.Map;
 import org.springframework.http.HttpEntity;

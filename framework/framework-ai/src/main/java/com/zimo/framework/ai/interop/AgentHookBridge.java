@@ -3,7 +3,7 @@ package com.zimo.framework.ai.interop;
 import com.zimo.framework.ai.sandbox.SandboxBackend;
 import com.zimo.framework.ai.sandbox.SandboxCommand;
 import com.zimo.framework.ai.sandbox.SandboxResult;
-import com.zimo.framework.ai.skill.AiSkillResult;
+import com.zimo.framework.common.skill.AiSkillResult;
 import com.zimo.framework.ai.skill.ToolCallContext;
 import com.zimo.framework.ai.skill.ToolHook;
 import java.util.List;

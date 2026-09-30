@@ -2,6 +2,7 @@ package com.zimo.framework.ai.skill;
 
 import java.util.Map;
 import java.util.Optional;
+import com.zimo.framework.common.skill.AiSkillResult;
 
 /**
  * 工具流水线钩子（对齐 DeepSeek Harness tool pipeline pre/post hooks）。

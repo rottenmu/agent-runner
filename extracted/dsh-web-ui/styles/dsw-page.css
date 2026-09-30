@@ -1,0 +1,1584 @@
+/* ==========================================================================
+ * dsw-page.css — DeepSeek Harness 页面结构样式（逐模块抽取）
+ *
+ * 抽取来源（deepseek-harness，MIT）：
+ *   packages/client/ui-layout/src/client/AppFrame.module.css        → .af-*
+ *   packages/client/ui-layout/src/client/columns.ts                 → 列宽常量
+ *   packages/client/ui-sidebar/src/client/SidebarRoot.module.css    → .sb-*
+ *   packages/client/ui-conversation/src/client/skeleton/
+ *     ConversationRoot.module.css                                   → .cv-*
+ *     InputBar.module.css                                           → .ib-*
+ *     HeroShell.module.css                                          → .sh-*
+ *   packages/client/ui-chat/src/client/chat/
+ *     ChatView.module.css                                           → .ch-*
+ *     MessageItem.module.css                                        → .msg-*
+ *     TurnProcessNodeView.module.css                                → .tpn-*
+ *   packages/client/ui-theme/src/styles/gradient-shadow-text.css    → 文本阶梯
+ *
+ * 抽取约定：
+ *  1. 源码用 CSS Modules，类名是短名（.root / .header …）。此页是单文件
+ *     作用域，故按模块加上前缀避免撞名，映射关系写在每段的注释里。
+ *     类名语义、属性顺序、数值一律不改。
+ *  2. 所有颜色只走 var(--dsw-*)，与源码一致 —— 这是浅深主题能整体翻转的前提。
+ *  3. 唯一的 UI 框架依赖是原生 CSS。源码里的 `composes` / `:global()` /
+ *     container query 用法按注释保留。
+ *  4. 依赖交互状态的选择器（悬停 / 激活 / 开合）保留原样，仅把「由 React 写
+ *     data-* 属性」改成「由这一页的极简脚本写同样名字的 data-* 属性」，
+ *     选择器本身不动。
+ * ========================================================================== */
+
+/* ==========================================================================
+ * 0. 基础重置
+ * ========================================================================== */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--dsw-alias-bg-base);
+  color: var(--dsw-alias-label-primary);
+  font-family: var(--dsw-font-family);
+  font-size: var(--dsh-content-font-size);
+  line-height: 24px;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+/* 整站无选中高亮外框以外的默认装饰；焦点环由各控件自己给 */
+:focus {
+  outline: none;
+}
+
+/* 图标统一走 currentColor 描边，与源码的图标集约定一致 */
+.ic {
+  display: block;
+  flex: none;
+}
+
+/* ==========================================================================
+ * 1. 三栏外壳 —— AppFrame.module.css
+ *
+ * 源码用 JS 求列宽后写 inline style，这里改用 CSS 变量表达同一套常量：
+ *   CENTER_MIN 400 / SIDEBAR_MIN 264 / SIDEBAR_MAX 420 / SIDEBAR_DEFAULT 280
+ *   SIDEBAR_COLLAPSED 56 / SIDEBAR_AUTO_COLLAPSE 1024 / RIGHTBAR_MIN 300
+ *   RIGHTBAR_MAX_RATIO 0.7 / RIGHTBAR_DEFAULT_RATIO 0.45
+ *
+ * 右栏是「轨道」不是「盒子」：它的占用者把面板锚在框架右边缘上并自己画左边框，
+ * 轨道只决定中栏要不要让位 —— 因此右栏设 overflow: visible 而左栏裁剪。
+ * ========================================================================== */
+.af-frame {
+  position: relative; /* 拖拽手柄跨列边界，靠它做定位上下文 */
+  display: grid;
+  grid-template-rows: 100%;
+  grid-template-columns:
+    var(--af-sidebar, 280px)
+    minmax(0, 1fr)
+    var(--af-rightbar, min(45%, 920px));
+  height: 100%;
+  overflow: hidden;
+  background: var(--dsw-alias-bg-base);
+  /* 开合动画作用在轨道上，走上游同一条缓动曲线 */
+  transition: grid-template-columns var(--ds-transition-duration-slow) var(--ds-ease-in-out);
+}
+
+/* 拖拽期间按指针节奏写宽度，再加缓动会让列脱离手柄 */
+.af-frame[data-dragging] {
+  transition: none;
+}
+
+.af-frame[data-sidebar-collapsed] {
+  --af-sidebar: 56px;
+}
+
+.af-frame[data-rightbar-collapsed] {
+  --af-rightbar: 0px;
+}
+
+/* 视口低于 1024px 自动收成 56px 图标轨（deepsuite LG 断点） */
+@media (max-width: 1024px) {
+  .af-frame {
+    --af-sidebar: 56px;
+  }
+}
+
+.af-sidebar-col {
+  min-width: 0;
+  overflow: hidden;
+  background: var(--dsw-specific-sidebar-fill);
+  border-right: 0.5px solid var(--dsw-alias-border-l3);
+}
+
+.af-center-col {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.af-rightbar-col {
+  position: relative;
+  min-width: 0;
+  overflow: visible;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .af-frame {
+    transition: none;
+  }
+}
+
+/* ==========================================================================
+ * 2. 侧栏 —— SidebarRoot.module.css
+ *
+ * 折叠是「滑走 + 淡出」而不是变形：内容保持冻结的展开布局原地淡出，
+ * 滑动的列（AppFrame 轨道）把它裁掉，淡出落定后才切到 rail 布局，
+ * 所以滑动过程中没有任何回流。
+ * ========================================================================== */
+.sb-root {
+  --dsh-sidebar-inline-padding: 12px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 6px var(--dsh-sidebar-inline-padding);
+  background: var(--dsw-specific-sidebar-fill);
+  color: var(--dsw-alias-label-primary);
+  font-size: 14px;
+  /* 侧栏浮在会话面之上，露出的滚动条用 l2 那一对 */
+  --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
+  --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
+}
+
+/* 图标轨几何：36x36 控件盒居中于 56px 轨（左右各 10px 内边距） */
+.sb-root[data-collapsed] {
+  padding: 18px 10px 6px;
+}
+
+/* 折叠相 1：整块冻结宽度的内容 150ms 原地淡出 */
+.sb-root[data-fading] > * {
+  opacity: 0;
+  transition: opacity 150ms var(--ds-ease-in-out);
+}
+
+.sb-root[data-collapsed] .sb-wide {
+  display: none;
+}
+
+/* 品牌行（figma pad 4/8/4/8）：展开态把面板开关压在右边缘 */
+.sb-logo-row {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  height: 60px;
+  padding: 8px 0 8px 4px;
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+
+.sb-root[data-collapsed] .sb-logo-row {
+  height: 36px;
+  padding: 0;
+  margin-bottom: 12px;
+  justify-content: flex-start;
+}
+
+/* 品牌组：整枚字标走文本墨色。它只是个按钮（新建会话快捷键），
+   唯一线索是 cursor —— 标记本身没有悬停态。 */
+.sb-brand {
+  flex: 1;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  overflow: hidden;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.sb-brand-identity {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 24px;
+  min-width: 0;
+}
+
+.sb-brand-mark {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 字标。必须 nowrap：它是 flex:1 的可压缩项，一旦允许换行，
+   名字会在 24px 的行盒里折成两行并被父级 overflow 裁掉半个字。
+   源码里 LOCAL 徽标是品牌行的**独立座位**（.localBuildBrand，两行栈），
+   不是名字节点的一部分；放在这里由 identity 的 gap 8 拉开。 */
+.sb-brand-name {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  height: 24px;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 24px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+/* 本地构建徽标：墨底反白，等宽 6px —— 尺寸刻意做小，只为标注身份 */
+.sb-build-version {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  height: 10px;
+  padding: 0 3px;
+  border-radius: 2px;
+  color: var(--dsw-alias-label-primary-inverted);
+  background: var(--dsw-alias-label-primary);
+  font-family: var(--ds-font-family-code);
+  font-size: 6px;
+  font-weight: 500;
+  line-height: 10px;
+  white-space: nowrap;
+}
+
+/* 圆形图标钮：28px，悬停给一层 6% 交互底 */
+.sb-icon-button {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  corner-shape: round; /* 全圆形状必须显式退出 superellipse，否则被压成方圆形 */
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.sb-icon-button:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.sb-root[data-collapsed] .sb-icon-button {
+  width: 36px;
+  height: 36px;
+  color: var(--dsw-alias-label-primary);
+}
+
+/* 新建会话：38px 高、12px 圆角、0.5px 发丝描边的实心条 */
+.sb-new-session {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 38px;
+  padding: 8px 16px;
+  margin: 0 2px 8px;
+  border: 0.5px solid var(--dsw-alias-border-l3);
+  border-radius: 12px;
+  background: var(--dsw-alias-button-elevated-fill);
+  color: var(--dsw-alias-label-primary);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 22px;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.sb-new-session:hover {
+  background: var(--dsw-alias-button-floating-hover);
+}
+
+.sb-root[data-collapsed] .sb-new-session {
+  align-self: flex-start;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  margin: 0 0 12px;
+  gap: 0;
+  border-color: transparent;
+  background: transparent;
+}
+
+.sb-root[data-collapsed] .sb-new-session:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+/* 面板列表：导航项 36px 高、8px 圆角；激活态是「更实的底 + 主墨色 + 500 字重」 */
+.sb-panel-list {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.sb-panel-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 36px;
+  padding: 7px 8px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  line-height: 22px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sb-panel-row:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.sb-panel-row[data-active] {
+  background: var(--dsw-alias-interactive-bg-active);
+  color: var(--dsw-alias-label-primary);
+  font-weight: 500;
+}
+
+.sb-panel-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sb-panel-count {
+  margin-left: auto;
+  color: var(--dsw-alias-label-caption);
+  font-size: 12px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 会话区席位：始终挂载，底部设置项才不会随内容上下浮动。
+   负右边距抵消外层内边距，让嵌套滚动条落到侧栏边缘。 */
+.sb-region {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin-left: -4px;
+  margin-right: calc(-1 * var(--dsh-sidebar-inline-padding));
+  padding-left: 4px;
+  overflow: hidden;
+}
+
+/* 工作区分节标题 */
+.sb-group-label {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 8px 0 12px;
+  color: var(--dsw-alias-label-caption);
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 500;
+  user-select: none;
+}
+
+/* 会话列表主体。scrollbar-gutter: stable 让显露滑块时行不位移。 */
+.sb-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: 8px;
+}
+
+.sb-session {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: 100%;
+  min-height: 48px;
+  padding: 7px 8px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.sb-session:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.sb-session[data-active] {
+  background: var(--dsw-alias-interactive-bg-active);
+  color: var(--dsw-alias-label-primary);
+}
+
+.sb-session-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 500;
+}
+
+.sb-session-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sb-session[data-active] .sb-session-title {
+  color: var(--dsw-alias-label-primary);
+}
+
+.sb-session-preview {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--dsw-alias-label-caption);
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 400;
+}
+
+/* 状态点：色即状态，不做装饰。「在跑」是唯一会动的状态。 */
+.sb-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  margin-left: auto;
+  border-radius: 50%;
+  corner-shape: round;
+  background: var(--dsw-alias-state-success-primary);
+  opacity: 0;
+}
+
+.sb-session[data-state='running'] .sb-dot {
+  opacity: 1;
+  background: var(--dsw-alias-state-business-primary);
+  animation: sb-dot-pulse 1s ease-in-out infinite alternate;
+}
+
+.sb-session[data-state='failed'] .sb-dot {
+  opacity: 1;
+  background: var(--dsw-alias-state-error-primary);
+}
+
+@keyframes sb-dot-pulse {
+  from { opacity: 0.35; }
+  to { opacity: 1; }
+}
+
+/* 底部署位：加法动作叠在设置之上 */
+.sb-foot {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 4px;
+  border-top: 0.5px solid var(--dsw-alias-border-l1);
+  margin-top: 4px;
+}
+
+/* ==========================================================================
+ * 3. 会话列 —— ConversationRoot.module.css
+ *
+ * 整列共享一条宽度轴：
+ *   W（--dsh-chat-content-width） = clamp(680px, 列宽 * 64%, 920px)
+ *   正文与 dock 卡 = W；输入卡 = W + 32px
+ * 源码里列宽由 ResizeObserver 发布为 --dsh-conversation-column-width。
+ * 这里改用百分比表达同一条式：百分比在 max-width 上对包含块求解，
+ * 效果等价且不需要测量 —— 这是本页唯一的实现方式差异。
+ * ========================================================================== */
+.cv-root {
+  position: relative; /* slot 拥有的绝对定位装饰层的上下文 */
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 0;
+  background: var(--dsw-alias-bg-base);
+
+  --dsh-chat-content-width: var(--dsh-chat-user-width, clamp(680px, 64%, 920px));
+  --dsh-composer-card-max-width: calc(var(--dsh-chat-content-width) + 32px);
+  --dsh-composer-side-clearance: 16px;
+  --dsh-composer-dock-inset: 8px;
+  /* 所有输入区文本的共同上限：14 行 × 24px */
+  --dsh-composer-text-max-height: 336px;
+}
+
+/* 头部 76px 与它的分隔线：侧栏页签条 38px + 面板头 38px，
+   两边的水平线在列边缘对齐到同一高度。 */
+.cv-header {
+  flex: none;
+  min-height: 76px;
+  padding: 10px 28px 0 20px;
+  border-bottom: 0.5px solid var(--dsw-alias-border-l3);
+}
+
+.cv-title-row {
+  display: flex;
+  align-items: center;
+  min-height: 30px;
+}
+
+.cv-title-cluster {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* 面包屑：段与「/」都各自是一枚 r12 的按钮，悬停才出底 */
+.cv-crumbs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.cv-crumb-sep {
+  color: var(--dsw-alias-label-caption);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.cv-crumb {
+  max-width: 220px;
+  overflow: hidden;
+  padding: 4px 8px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--dsw-alias-label-tertiary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.cv-crumb:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.cv-crumb[data-current] {
+  font-weight: 500;
+  color: var(--dsw-alias-label-primary);
+  cursor: default;
+}
+
+.cv-header-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 页签：13/16 500，间距 36，2px 指示条压在头部的分隔线上 */
+.cv-tabs {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  gap: 36px;
+  margin-top: 10px;
+  padding-left: 8px;
+}
+
+.cv-tab {
+  position: relative;
+  padding: 0 0 9px;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 500;
+  color: var(--dsw-alias-label-tertiary);
+  cursor: pointer;
+}
+
+.cv-tab::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: transparent;
+}
+
+/* 选中态走 business 蓝而不是品牌色：brand-primary 在这套令牌里解析为墨色，
+   business 蓝是两种主题下都保持蓝的最近语义 token。 */
+.cv-tab[data-active] {
+  color: var(--dsw-alias-state-business-primary);
+}
+
+.cv-tab[data-active]::after {
+  background: var(--dsw-alias-state-business-primary);
+}
+
+.cv-body {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* 滚动口。右侧让 2px 是整站约定：滑块不贴列边缘。
+   无条件预留 gutter —— composer 席位骑在这个盒子的内容框上，
+   gutter 一变输入卡会横向位移。 */
+.cv-scroll {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  margin-right: 2px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.cv-scroll::-webkit-scrollbar-track {
+  margin: 2px;
+}
+
+.cv-view-area {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  min-height: auto;
+}
+
+/* Composer 席位：粘在底部，z-index 7 高于 Markdown 代码块的 sticky 标题（6）。
+   顶部 36px 是一段固定高度的淡出带，正文从它下面沉下去 ——
+   用 px 停位而不是百分比，草稿变高时只是实心区变宽，淡出带不会被拉长。 */
+.cv-composer-seat {
+  position: sticky;
+  bottom: 0;
+  z-index: 7;
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--dsw-alias-bg-base) 0%, transparent) 0px,
+    var(--dsw-alias-bg-base) 36px
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sb-root[data-fading] > * {
+    transition: none;
+  }
+}
+
+/* ==========================================================================
+ * 4. 对话正文 —— ChatView.module.css / MessageItem.module.css /
+ *    TurnProcessNodeView.module.css / AssistantMarkdown.module.css
+ * ========================================================================== */
+
+/* 滚动口即 inline-size 查询容器：宽表格的「破栏」按它的内容宽度算
+   （源码用 100cqw 代替 deepsuite 的 JS 测量值）。 */
+.ch-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  /* 左右 = composer 侧余量 + 16px：窄视口下正文恰好比输入卡窄 32px */
+  padding: 16px calc(var(--dsh-composer-side-clearance) + 16px);
+  container-type: inline-size;
+}
+
+.ch-root {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
+  max-width: var(--dsh-chat-content-width);
+  margin: 0 auto;
+}
+
+/* ---- 用户气泡 ----
+   右对齐列（气泡 + 动作条），r22，宽度上限取内容轴的 70.2%（525/748），
+   所以列被拖宽时气泡同比例变宽。 */
+.msg-user-row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.msg-user-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  min-width: 0;
+  max-width: min(calc(var(--dsh-chat-content-width, 748px) * 0.702), 82%);
+}
+
+.msg-bubble {
+  max-width: 100%;
+  background: var(--dsw-specific-bubble);
+  border-radius: 22px;
+  /* 默认字号下单行气泡 42px：22 行距 + 上下各 10 内边距 */
+  padding: 10px 16px;
+  font-size: var(--dsh-content-font-size);
+  line-height: calc(22px + var(--dsh-content-font-delta));
+  color: var(--dsw-alias-label-primary);
+  /* 投影出来的用户文本是行内片段，换行由气泡自己管，
+     这样带装饰的单行消息才不会被拆成两行 */
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ---- 助手正文 ----
+   整栏叙述，块间距 16，正文 14/24 */
+.asst {
+  display: flex;
+  flex-direction: column;
+  font-size: var(--dsh-content-font-size);
+  line-height: calc(24px + var(--dsh-content-font-delta));
+  color: var(--dsw-alias-label-primary);
+}
+
+.asst-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.asst-body p {
+  margin: 0;
+}
+
+.asst-body strong {
+  font-weight: 600;
+}
+
+.asst-body a {
+  color: var(--dsw-alias-link);
+  text-decoration: none;
+}
+
+.asst-body a:hover {
+  text-decoration: underline;
+}
+
+.asst-body ul,
+.asst-body ol {
+  margin: 0;
+  padding-left: 22px;
+}
+
+.asst-body li + li {
+  margin-top: 4px;
+}
+
+/* 行内代码：11px 是紧凑次级文本，再小会掉到不可读 */
+.asst-body code {
+  padding: 1px 5px;
+  border-radius: 6px;
+  background: var(--dsw-alias-markdown-inline-code);
+  font-family: var(--ds-font-family-code);
+  font-size: 12px;
+  line-height: 20px;
+}
+
+/* 代码块：banner + 主体两段，主体可横向滚动 */
+.md-code {
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--dsw-alias-markdown-code-block);
+}
+
+.md-code-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 32px;
+  padding: 0 8px 0 12px;
+  background: var(--dsw-alias-markdown-code-block-banner);
+  color: var(--dsw-alias-label-tertiary);
+  font-family: var(--ds-font-family-code);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.md-code-lang {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.md-code-body {
+  margin: 0;
+  padding: 10px 12px;
+  overflow-x: auto;
+  font-family: var(--ds-font-family-code);
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--dsw-alias-label-primary);
+  white-space: pre;
+  tab-size: 2;
+}
+
+/* ---- 轮次过程折叠行 ----
+   33px 高、底部 0.5px 发丝线，chevron 收起时朝右（-90deg） */
+.tpn-root {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  height: 33px;
+  padding: 0 0 8px;
+  border: none;
+  border-bottom: 0.5px solid var(--dsw-alias-border-l2);
+  background: none;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+  text-align: left;
+}
+
+.tpn-root:not([data-open]) {
+  margin-bottom: 8px;
+}
+
+.tpn-chevron {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-left: 6px;
+  color: var(--dsw-alias-label-tertiary);
+  transform: rotate(-90deg);
+  transition: transform 100ms ease;
+}
+
+.tpn-root[data-open] .tpn-chevron {
+  transform: rotate(0deg);
+}
+
+.tpn-label {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 14px;
+  line-height: 24px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- 工具调用行 ----
+   16/28 的正文，kicker 用等宽小字；右侧靠图标动作条 */
+.tool-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+  padding: 2px 0;
+  border-radius: 6px;
+  color: var(--dsw-alias-label-secondary);
+  font-size: var(--dsh-content-font-size-secondary);
+  line-height: calc(20px + var(--dsh-content-font-delta-secondary));
+}
+
+.tool-name {
+  flex: none;
+  color: var(--dsw-alias-label-primary);
+  font-family: var(--ds-font-family-code);
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 500;
+}
+
+.tool-arg {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--ds-font-family-code);
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.tool-stat {
+  flex: none;
+  margin-left: auto;
+  font-family: var(--ds-font-family-code);
+  font-size: 12px;
+  line-height: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tool-stat .add { color: var(--dsw-alias-state-success-primary); }
+.tool-stat .del { color: var(--dsw-alias-state-error-primary); }
+
+.tool-ms {
+  flex: none;
+  color: var(--dsw-alias-label-caption);
+  font-size: 12px;
+  line-height: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 状态圆点：同样的「色即状态」约定 */
+.tool-state {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  corner-shape: round;
+  background: var(--dsw-alias-state-success-primary);
+}
+
+.tool-state[data-fail] {
+  background: var(--dsw-alias-state-error-primary);
+}
+
+/* ---- 轮次状态行 ----
+   26px 行、正文号 + 22px 行距、时钟走次级档并锁等宽数字 */
+.turn-status {
+  align-self: flex-start;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  height: calc(26px + var(--dsh-content-font-delta));
+  font-size: var(--dsh-content-font-size);
+  line-height: calc(22px + var(--dsh-content-font-delta));
+  color: var(--dsw-alias-label-tertiary);
+  white-space: nowrap;
+}
+
+.turn-status-clock {
+  margin-left: 8px;
+  font-size: var(--dsh-content-font-size-secondary);
+  line-height: calc(20px + var(--dsh-content-font-delta-secondary));
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  color: var(--dsw-alias-label-caption);
+}
+
+/* 消息下方的动作条：预留 16px 上边距，与正文内部间距分开，
+   这样正文只有一块时页脚间距也不会变 */
+.msg-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: 16px;
+  margin-left: -6px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.msg-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  corner-shape: round;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.msg-action:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+/* ==========================================================================
+ * 5. 输入卡 —— InputBar.module.css
+ *
+ * 这是全站唯一一处「浮层不占布局」的做法示范：
+ * 卡片 border: 0，分离感靠 0.5px 发丝描边（--dsw-elevation-stroke）+ 柔光承担。
+ * 22px 圆角，桌面端最大宽度 = 内容轴 + 32px。
+ * ========================================================================== */
+.ib-root {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* 侧内边距 = 共享余量；底部渐变遮罩归正文滚动口所有，这里不重复 */
+  padding: 0 var(--dsh-composer-side-clearance) 8px;
+}
+
+/* 统计条挂上来时它自带 4px 上边距，root 的底部余量收紧以保住 8px 节奏 */
+.ib-root:has([data-composer-stats]) {
+  padding-bottom: 4px;
+}
+
+.ib-stats {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  max-width: var(--dsh-chat-content-width);
+  width: 100%;
+  padding: 4px calc(var(--dsh-composer-side-clearance) + 16px) 0;
+  font-size: var(--dsh-content-font-size-secondary);
+  line-height: calc(20px + var(--dsh-content-font-delta-secondary));
+}
+
+.ib-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 1px 8px;
+  border: none;
+  border-radius: 24px;
+  corner-shape: round;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ib-pill:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.ib-card {
+  position: relative; /* 浮层锚点定位上下文 */
+  display: flex;
+  flex-direction: column;
+  /* 文本区与按钮行之间 12px */
+  gap: 12px;
+  width: 100%;
+  max-width: var(--dsh-composer-card-max-width);
+  padding-top: 8px;
+  /* 输入框描边：浅色中性（l2，比菜单的 l1 高一档），
+     以高度发丝绘制，因此不占布局 */
+  border: 0;
+  --dsw-elevation-stroke-color: var(--dsw-alias-border-l2);
+  border-radius: 22px;
+  background: var(--dsw-specific-input-major);
+  box-shadow: var(--dsw-elevation-soft);
+  font-size: var(--dsh-content-font-size);
+  line-height: calc(24px + var(--dsh-content-font-delta));
+  /* 草稿滚起来后滑块走 l2 —— 声明在卡片上，自定义属性会继承到真正滚动的盒子 */
+  --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
+  --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
+}
+
+/* 无工作区触发态：虚线 l4 描边把卡片标成「先去选个工作区」而不是可用输入框。
+   原生 dashed 的虚线模式固定，故用 ::after + SVG 掩码做描边，
+   这样 22px 圆角和两种主题都保得住。 */
+.ib-card[data-workspace-trigger] {
+  --dsw-elevation-stroke-color: transparent;
+  cursor: pointer;
+}
+
+.ib-card[data-workspace-trigger]::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: 22px;
+  background: var(--dsw-alias-border-l4);
+  transition: background-color 100ms ease;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='100%25' height='100%25' fill='none' rx='22' ry='22' stroke='black' stroke-width='2' stroke-dasharray='4 4'/%3E%3C/svg%3E");
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='100%25' height='100%25' fill='none' rx='22' ry='22' stroke='black' stroke-width='2' stroke-dasharray='4 4'/%3E%3C/svg%3E");
+  pointer-events: none;
+}
+
+.ib-card[data-workspace-trigger]:hover::after {
+  background: var(--dsw-alias-state-business-primary);
+}
+
+/* 草稿滚动口，也是 composer 里唯一会滚的盒子；
+   14 行上限挂在这里，因为上限描述的就是这个盒子 */
+.ib-scroll {
+  max-height: var(--dsh-composer-text-max-height);
+  overflow-y: auto;
+  margin-right: 4px;
+}
+
+/* 卡片的 22px 圆角弧会压到滚动口顶部，让滑块行程从弧以下开始，
+   滑块永远不会探出胶囊外 */
+.ib-scroll::-webkit-scrollbar-track {
+  margin-top: 8px;
+}
+
+.ib-grow {
+  position: relative;
+}
+
+/* 草稿面：跟着内容长高（.ib-scroll 负责封顶与滚动）。
+   下沿留 8px 呼吸，故停靠态地板是 24 行距 + 4 上边距 = 28 内容高，36 是盒高 */
+.ib-input {
+  min-height: 36px;
+  padding: 4px 8px 0 14px;
+  font-family: var(--dsw-font-family);
+  font-size: inherit;
+  line-height: inherit;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  outline: none;
+  color: var(--dsw-alias-label-primary);
+  /* 光标用 business 蓝，不用 brand-primary —— 后者在这套表里解析为墨色 */
+  caret-color: var(--dsw-alias-state-business-primary);
+}
+
+.ib-input:empty::before {
+  content: attr(data-placeholder);
+  color: var(--dsw-alias-label-caption);
+  pointer-events: none;
+  user-select: none;
+}
+
+/* 按钮行：左侧 + / Plan / Read-only，右侧 模型 / 发送 */
+.ib-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 8px 6px;
+  min-width: 0;
+  /* 尺寸容器：行宽不够时行内的 chip 能退化成图标形态 */
+  container-type: inline-size;
+}
+
+.ib-tools,
+.ib-trailing {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 12px;
+}
+
+.ib-trailing {
+  flex: none;
+  /* 换行后重锚到右侧；单行时 space-between 已经把它抵在右边 */
+  margin-left: auto;
+}
+
+/* 附件圆钮：28px，selector 底，主墨色字形 */
+.ib-add {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 999px;
+  corner-shape: round;
+  background: var(--dsw-specific-selector);
+  color: var(--dsw-alias-label-primary);
+  cursor: pointer;
+}
+
+.ib-add:hover {
+  background: var(--dsw-alias-interactive-bg-hover-solid);
+}
+
+/* Plan / Read-only / 模型 —— 原生 select，chip 形态的闭合外观（13/20 500） */
+.ib-select {
+  max-width: 220px;
+  height: 28px;
+  padding: 0 20px 0 8px;
+  border: none;
+  border-radius: 8px;
+  outline: none;
+  background-color: transparent;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M3 4.5L6 7.5L9 4.5' stroke='%2381858C' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 4px center;
+  background-size: 12px 12px;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  appearance: none;
+}
+
+.ib-select:hover {
+  background-color: var(--dsw-alias-interactive-bg-hover);
+}
+
+/* 主发送钮：34px 圆，走上游 info-fill 那一对蓝，不是 button-primary 的墨色；
+   字形恒为白，两种主题都是。translateY(-2px) 让它留在原位而较小的 chip 略下沉。 */
+.ib-send {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 999px;
+  corner-shape: round;
+  background: var(--dsw-alias-button-info-fill);
+  color: #fff;
+  cursor: pointer;
+  transition: background-color 100ms ease;
+  transform: translateY(-2px);
+}
+
+.ib-send:hover {
+  background: var(--dsw-alias-button-info-hover);
+}
+
+/* 空草稿 = 0.4 透明度，仍可点（源码由 disabled 表达，这里用属性选择器同步外观） */
+.ib-card[data-empty] .ib-send {
+  opacity: 0.4;
+}
+
+/* ==========================================================================
+ * 6. 新建会话首屏 —— HeroShell.module.css
+ *
+ * 与上面同一张输入卡，只是栈居中：鱼 + 标题、工作区 chip、卡片。
+ * 首屏是 52px 双行地板，停靠态收到内容高 —— 同一个组件两种相位。
+ * ========================================================================== */
+.sh-root {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-width: 0;
+  padding: 0 24px;
+}
+
+.sh-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  width: 100%;
+  max-width: var(--dsh-composer-card-max-width);
+  overflow: visible;
+}
+
+/* 鱼 + 标题居中，26/32 500。溢出驱动而非断点：宽度够时同处一行，
+   挤了就整块折到上一行 */
+.sh-headline {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 10px;
+  row-gap: 12px;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  line-height: 32px;
+  font-weight: 500;
+  color: var(--dsw-alias-label-primary);
+}
+
+.sh-title-group {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  column-gap: 7px;
+  row-gap: 4px;
+  min-width: 0;
+}
+
+/* 预览版徽标：上标小胶囊，等宽字，business 三级底 */
+.sh-preview-badge {
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 1px 7px 0;
+  border: 0.5px solid var(--dsw-alias-interactive-bg-hover);
+  border-radius: 24px;
+  corner-shape: round;
+  background: var(--dsw-alias-state-business-tertiary);
+  color: var(--dsw-alias-label-primary-bluish);
+  font-family: var(--ds-font-family-code);
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* 首屏的鱼会缓慢摆尾；只在支持悬停且不要求减弱动效时启动 */
+.sh-fish {
+  display: block;
+  overflow: visible;
+  transform-origin: 50% 60%;
+  color: var(--dsw-alias-label-primary);
+}
+
+@keyframes hero-fish-swim {
+  0%,
+  100% { transform: none; }
+  35% { transform: rotate(-4deg) translate(-0.4px, -0.9px); }
+  70% { transform: rotate(1.6deg) translate(0.3px, 0.2px); }
+}
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .sh-fish-hitbox:hover .sh-fish {
+    animation: hero-fish-swim 1.6s ease-in-out infinite;
+  }
+}
+
+/* 工作区行落在外层栈里，卡片上方 12px */
+.sh-workspace-row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  padding-left: 8px;
+}
+
+/* 文件夹 + 标签 + chevron：静止无底，悬停或展开才给。
+   标签从左往右缩到没有，folder 与 chevron 始终贴着剩余文本 —— 溢出驱动，无断点。 */
+.sh-workspace {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: min(100%, 360px);
+  min-height: 28px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 16px;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.sh-workspace:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.sh-workspace-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sh-chevron {
+  flex: none;
+  color: var(--dsw-alias-label-caption);
+}
+
+/* 首屏相位：输入卡保持两行地板，草稿面高一些 */
+.sh-root .ib-input {
+  min-height: 52px;
+}
+
+/* ==========================================================================
+ * 7. 右栏 —— 文件树 + 文档预览
+ *
+ * ⚠ 本段是唯一「非源码直录」的部分。源码里右栏由 ui-sidebar-right 的
+ *   dockkit 分裂树驱动（ui-dockkit/src/components/dockkit.module.css），
+ *   其尺寸只有 ConversationRoot 注释里记录的那一条约束：
+ *   页签条 38px + 面板头 38px = 76px，与左侧头部的水平线在列边缘对齐。
+ *   此处按该约束 + 与全站一致的令牌词汇重写，几何值取自公开注释，
+ *   未逐条比对 dockkit 源文件 —— 若要与实现完全一致，请以
+ *   packages/client/ui-dockkit/src/components/dockkit.module.css 为准。
+ * ========================================================================== */
+.rs-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  /* 宽度取轨道自身（轨道已 = 框架的 min(45%, 920px)，即源码的 normal.rightbar）。
+     不能写 min(45%, 920px)：百分比解析到的是这一列而不是框架，
+     45% × 566 = 255 会被 min-width 顶成 300，面板就比轨道窄一截。
+     min-width 保留源码的 RIGHTBAR_MIN（300）。 */
+  width: 100%;
+  min-width: 300px;
+  background: var(--dsw-alias-bg-layer-1);
+  border-left: 0.5px solid var(--dsw-alias-border-l3);
+}
+
+/* 收起态：源码里 rightbarShown 为假时占用者什么都不渲染。
+   这里同样整块隐藏 —— 不隐藏的话 min-width 会把它撑成 300px 悬在中栏上方。 */
+.af-frame[data-rightbar-collapsed] .rs-panel {
+  display: none;
+}
+
+/* 页签条 38px */
+.rs-tab-strip {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 38px;
+  padding: 0 8px;
+  border-bottom: 0.5px solid var(--dsw-alias-border-l2);
+}
+
+.rs-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.rs-tab:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.rs-tab[data-active] {
+  background: var(--dsw-alias-interactive-bg-active);
+  color: var(--dsw-alias-label-primary);
+}
+
+/* 面板头 38px */
+.rs-pane-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 12px;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.rs-pane-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  padding: 4px 8px 12px;
+}
+
+/* 文件树：行高 26px，缩进靠 padding-left，悬停给 8% 底 */
+.rs-tree-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: 26px;
+  padding-right: 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 13px;
+  line-height: 20px;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.rs-tree-row:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.rs-tree-row[data-active] {
+  background: var(--dsw-alias-interactive-bg-active);
+  color: var(--dsw-alias-label-primary);
+}
+
+.rs-tree-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rs-tree-row[data-dir] .rs-tree-label {
+  color: var(--dsw-alias-label-primary);
+}
+
+/* 未保存改动标记：绿加红减，等宽数字 */
+.rs-change {
+  margin-left: auto;
+  flex: none;
+  font-family: var(--ds-font-family-code);
+  font-size: 11px;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+}
+
+.rs-change .add { color: var(--dsw-alias-state-success-primary); }
+.rs-change .del { color: var(--dsw-alias-state-error-primary); }
+
+/* ---- 差异视图视图（右栏第二页签） ---- */
+.rs-diff {
+  font-family: var(--ds-font-family-code);
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.rs-diff-hunk {
+  margin: 8px 0 4px;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: var(--dsw-alias-markdown-code-block-banner);
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.rs-diff-line {
+  display: flex;
+  gap: 10px;
+  padding: 0 6px;
+  white-space: pre;
+}
+
+.rs-diff-line[data-kind='add'] {
+  background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 12%, transparent);
+}
+
+.rs-diff-line[data-kind='del'] {
+  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 12%, transparent);
+}
+
+.rs-diff-sign {
+  flex: none;
+  width: 8px;
+  color: var(--dsw-alias-label-caption);
+}
+
+.rs-diff-line[data-kind='add'] .rs-diff-sign { color: var(--dsw-alias-state-success-primary); }
+.rs-diff-line[data-kind='del'] .rs-diff-sign { color: var(--dsw-alias-state-error-primary); }

@@ -3,7 +3,7 @@ package com.zimo.framework.ai.intent.demo;
 import com.zimo.framework.ai.intent.IntentCheckableSkill;
 import com.zimo.framework.ai.intent.RuleIntentChecker;
 import com.zimo.framework.ai.intent.SkillIntentCompositeChecker;
-import com.zimo.framework.ai.skill.AiSkillResult;
+import com.zimo.framework.common.skill.AiSkillResult;
 import java.util.List;
 import java.util.Map;
 

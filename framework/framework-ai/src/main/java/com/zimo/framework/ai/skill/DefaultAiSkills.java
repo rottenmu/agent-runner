@@ -2,6 +2,8 @@ package com.zimo.framework.ai.skill;
 
 import java.util.Map;
 import cn.hutool.core.collection.CollUtil;
+import com.zimo.framework.common.skill.AiSkill;
+import com.zimo.framework.common.skill.AiSkillResult;
 
 public final class DefaultAiSkills {
     private DefaultAiSkills() {

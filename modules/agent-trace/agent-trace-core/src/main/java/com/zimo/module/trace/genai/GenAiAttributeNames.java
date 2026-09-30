@@ -43,6 +43,14 @@ public final class GenAiAttributeNames {
     /** 链路 ID（traceId）。 */
     public static final String TRACE_ID = "gen_ai.trace_id";
 
+    /**
+     * 规范化后的步骤类型（本项目自有扩展，非 OTel 标准）。
+     *
+     * <p>取值为 {@link GenAiStepTypes} 的规范词，便于导出侧按统一口径聚合，
+     * 不必再兼容历史上那三套词汇。</p>
+     */
+    public static final String STEP_TYPE = "gen_ai.step.type";
+
     /** 工具名（tool span）。 */
     public static final String TOOL_NAME = "gen_ai.tool.name";
     /** 工具入参。 */

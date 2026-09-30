@@ -63,15 +63,58 @@ class GenAiTraceObserverTest {
         assertThat(GenAiSpanKind.fromStepType(null)).isEqualTo(GenAiSpanKind.TASK);
     }
 
+    /**
+     * 回归守卫：onBegin 未到达的链路<b>不再整条丢弃</b>。
+     *
+     * <p>历史 bug：onStep 开头有 {@code if (!traceSpans.containsKey(traceId)) return;}，
+     * 只要 onBegin 没到（中间件未装配 / 事件来自其它路径），后续所有 step 全被静默吞掉，
+     * 且 onEnd 又因 root 为 null 提前 return，最终一条 span 都导不出——表现就是
+     * "observer 注册成功但产出为 0"。现改为 {@code ensureRoot} 兜底补建根 span。</p>
+     */
     @Test
-    void ignoresStepsBeforeBeginAndEndsWithoutTrace() {
+    void synthesizesRootWhenBeginNeverArrived() {
         CollectingExporter exporter = new CollectingExporter();
         GenAiTraceObserver observer = new GenAiTraceObserver(exporter);
 
-        observer.onStep("no-trace", 1, "tool", "x", "{}", "{}", 1L, "ok");
-        observer.onEnd("no-trace", "success", "p", "r", 0, 1L);
+        observer.onStep("no-trace", 1, "tool_call", "query_datasource",
+                "{}", "{}", 5L, "ok");
+        observer.onEnd("no-trace", "success", "p", "r", 0, 5L);
 
-        assertThat(exporter.spans).isEmpty();
+        // 根 span（兜底补建）+ 那一条 step
+        assertThat(exporter.spans).hasSize(2);
+        GenAiSpan root = exporter.spans.get(0);
+        assertThat(root.kind()).isEqualTo(GenAiSpanKind.AGENT);
+        assertThat(root.operationName()).isEqualTo(GenAiOperationName.INVOKE_AGENT);
+
+        GenAiSpan step = exporter.spans.get(1);
+        assertThat(step.kind()).isEqualTo(GenAiSpanKind.TOOL);
+        assertThat(step.name()).isEqualTo("execute_tool query_datasource");
+    }
+
+    /**
+     * 回归守卫：{@code model_call} / {@code reasoning} 不得退化成 TASK。
+     *
+     * <p>这三个词是 HarnessTraceMiddleware 实际写入的词汇，早期 fromStepType 完全不认识，
+     * 导致真实链路的 LLM span 全部塌成 TASK。</p>
+     */
+    @Test
+    void middlewareVocabularyYieldsRealKinds() {
+        CollectingExporter exporter = new CollectingExporter();
+        GenAiTraceObserver observer = new GenAiTraceObserver(exporter);
+
+        observer.onBegin("trace-2", "s", "a", "助手", "conversation", "console");
+        observer.onStep("trace-2", 1, "intent", "意图识别", "{}", "{}", 1L, "ok");
+        observer.onStep("trace-2", 2, "model_call", "模型调用 qwen-max", "{}", "{}", 1L, "ok");
+        observer.onStep("trace-2", 3, "reasoning", "推理", "{}", "{}", 1L, "ok");
+        observer.onStep("trace-2", 4, "tool_call", "search_docs", "{}", "{}", 1L, "ok");
+        observer.onEnd("trace-2", "success", "p", "r", 0, 5L);
+
+        assertThat(exporter.spans).hasSize(5);
+        assertThat(exporter.spans.get(2).kind()).isEqualTo(GenAiSpanKind.LLM);
+        assertThat(exporter.spans.get(4).kind()).isEqualTo(GenAiSpanKind.TOOL);
+        // LLM span 必须带上请求模型名
+        assertThat(exporter.spans.get(2).attributes())
+                .containsEntry(GenAiAttributeNames.REQUEST_MODEL, "qwen-max");
     }
 
     @Test

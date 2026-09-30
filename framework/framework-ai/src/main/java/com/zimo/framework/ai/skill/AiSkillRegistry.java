@@ -7,6 +7,8 @@ import java.util.Map;
 import java.util.Optional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
+import com.zimo.framework.common.skill.AiSkill;
+import com.zimo.framework.common.skill.AiSkillResult;
 
 /**
  * AI 技能注册表，统一维护 Spring Bean 技能和运行时配置的 API 技能。

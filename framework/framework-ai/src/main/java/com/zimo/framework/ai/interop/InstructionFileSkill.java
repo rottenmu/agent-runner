@@ -1,7 +1,7 @@
 package com.zimo.framework.ai.interop;
 
-import com.zimo.framework.ai.skill.AiSkill;
-import com.zimo.framework.ai.skill.AiSkillResult;
+import com.zimo.framework.common.skill.AiSkill;
+import com.zimo.framework.common.skill.AiSkillResult;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;

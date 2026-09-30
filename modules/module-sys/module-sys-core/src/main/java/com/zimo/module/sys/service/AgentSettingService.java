@@ -31,9 +31,10 @@ public interface AgentSettingService extends IService<AgentSetting> {
     Map<String, String> getEffectiveSettings();
 
     /**
-     * 批量保存预设配置项（新增或更新）。
+     * 批量保存预设配置项（新增或更新）；短期会话保留天数只允许 1 至 365 的整数。
      *
      * @param settings 配置键值对
+     * @throws IllegalArgumentException 短期会话保留天数为空、非整数或超出范围时抛出
      */
     void saveSettings(Map<String, String> settings);
 
@@ -55,7 +56,7 @@ public interface AgentSettingService extends IService<AgentSetting> {
      * @param configValue 配置值
      * @param remark 说明
      * @return 更新后的配置项
-     * @throws IllegalArgumentException 配置项不存在时抛出
+     * @throws IllegalArgumentException 配置项不存在或短期会话保留天数越界时抛出
      */
     AgentSetting updateSetting(Long id, String configValue, String remark);
 

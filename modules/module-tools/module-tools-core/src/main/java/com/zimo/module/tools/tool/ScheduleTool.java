@@ -1,8 +1,8 @@
 package com.zimo.module.tools.tool;
 
-import com.zimo.framework.ai.skill.AiSkill;
+import com.zimo.framework.common.skill.AiSkill;
 import cn.hutool.core.util.StrUtil;
-import com.zimo.framework.ai.skill.AiSkillResult;
+import com.zimo.framework.common.skill.AiSkillResult;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;

@@ -1,0 +1,1295 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PandaProbe · 智能体链路可观测控制台</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        ink: { 950:'#0a0e17', 900:'#0f1420', 850:'#141a28', 800:'#1a2133', 750:'#212a3e', 700:'#2a3449', 600:'#3a475f' },
+        edge: '#243044',
+        brand: { 400:'#4d9fff', 500:'#2b7fff', 600:'#1a63d8' },
+        llm:   { 400:'#b18cff', 500:'#8b5cf6' },
+        tool:  { 400:'#4ade9b', 500:'#22c55e' },
+        warn:  { 400:'#fbbf24', 500:'#f59e0b' },
+        bad:   { 400:'#ff6b6b', 500:'#ef4444' }
+      },
+      fontFamily: { mono: ['ui-monospace','SFMono-Regular','Menlo','Consolas','monospace'] }
+    }
+  }
+}
+</script>
+<style>
+  :root { color-scheme: dark; }
+  body { background:#0a0e17; }
+  ::-webkit-scrollbar { width:8px; height:8px; }
+  ::-webkit-scrollbar-track { background:#0f1420; }
+  ::-webkit-scrollbar-thumb { background:#2a3449; border-radius:4px; }
+  ::-webkit-scrollbar-thumb:hover { background:#3a475f; }
+  .panel { background:#141a28; border:1px solid #243044; border-radius:10px; box-shadow:0 2px 12px rgba(0,0,0,.45); }
+  .panel-hd { border-bottom:1px solid #243044; }
+  .tot-node { transition:background .12s; }
+  .tot-node:hover { background:#1a2133; }
+  .tot-node.sel { background:#1e2a44; box-shadow:inset 2px 0 0 #4d9fff; }
+  .tot-node.err { box-shadow:inset 2px 0 0 #ef4444; }
+  .tot-node.err.sel { box-shadow:inset 2px 0 0 #ef4444, inset 4px 0 0 #4d9fff; }
+  .chev { transition:transform .15s; }
+  .chev.collapsed { transform:rotate(-90deg); }
+  .fade-in { animation:fi .25s ease-out; }
+  @keyframes fi { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:none} }
+  @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:.35} }
+  .live-dot { animation:pulse-dot 1.6s ease-in-out infinite; }
+  .drawer { transition:transform .22s ease; }
+  .tab-btn.on { color:#4d9fff; border-color:#2b7fff; }
+  pre.code { background:#0d1220; border:1px solid #243044; border-radius:6px; padding:8px 10px; overflow:auto; font-size:11px; line-height:1.55; }
+  .tr-row:hover { background:#1a2133; }
+  .tr-row.sel { background:#1e2a44; }
+</style>
+</head>
+<body class="text-slate-300 text-[13px] antialiased">
+
+<header class="sticky top-0 z-40 bg-ink-900/95 backdrop-blur border-b border-edge">
+  <div class="px-5 h-14 flex items-center gap-5">
+    <div class="flex items-center gap-2.5 shrink-0">
+      <div class="w-7 h-7 rounded-md bg-brand-600 grid place-items-center">
+        <i class="fa-solid fa-paw text-white text-[12px]"></i>
+      </div>
+      <span class="font-semibold text-slate-100 tracking-tight">PandaProbe</span>
+      <span class="text-[10px] px-1.5 py-0.5 rounded bg-ink-750 text-slate-400 border border-edge">v2.4.1</span>
+    </div>
+
+    <div class="h-6 w-px bg-edge"></div>
+
+    <label class="flex items-center gap-2">
+      <i class="fa-solid fa-cube text-slate-500 text-[11px]"></i>
+      <select id="selProject" class="bg-ink-850 border border-edge rounded-md px-2 py-1 text-[12px] text-slate-200 outline-none focus:border-brand-500 cursor-pointer">
+        <option>customer-service-agents</option>
+        <option>order-fulfillment-bot</option>
+        <option>code-review-copilot</option>
+        <option>finance-audit-agent</option>
+      </select>
+    </label>
+
+    <div class="flex items-center bg-ink-850 border border-edge rounded-md p-0.5">
+      <button data-env="dev" class="env-btn px-2.5 py-1 rounded text-[11px] font-medium">开发</button>
+      <button data-env="prod" class="env-btn px-2.5 py-1 rounded text-[11px] font-medium">生产</button>
+    </div>
+
+    <div class="flex-1"></div>
+
+    <div class="flex items-center gap-1.5 text-[11px] text-slate-400">
+      <span class="w-1.5 h-1.5 rounded-full bg-tool-500 live-dot"></span>
+      <span>采集中</span>
+    </div>
+
+    <div class="font-mono text-[12px] text-slate-300 tabular-nums" id="clock">--:--:--</div>
+
+    <button id="btnRefresh" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-ink-850 border border-edge hover:border-brand-500 hover:text-brand-400 transition text-[12px]">
+      <i class="fa-solid fa-rotate text-[11px]" id="refreshIcon"></i>刷新
+    </button>
+  </div>
+</header>
+
+<main class="p-5 space-y-4">
+
+  <section class="grid grid-cols-4 gap-3">
+    <div class="panel p-4">
+      <div class="flex items-start justify-between mb-2">
+        <span class="text-[11px] text-slate-400">吞吐量 · 会话数/小时</span>
+        <i class="fa-solid fa-arrow-trend-up text-brand-400 text-[13px]"></i>
+      </div>
+      <div class="text-[26px] font-semibold text-slate-100 leading-none tabular-nums" id="kpiThroughput">1,284</div>
+      <div class="mt-2 flex items-center gap-1.5 text-[11px] text-tool-400">
+        <i class="fa-solid fa-caret-up"></i><span>+12.4%</span>
+        <span class="text-slate-500 ml-1">较上小时</span>
+      </div>
+    </div>
+
+    <div class="panel p-4">
+      <div class="flex items-start justify-between mb-2">
+        <span class="text-[11px] text-slate-400">响应延迟 P99 / P90</span>
+        <i class="fa-solid fa-gauge-high text-llm-400 text-[13px]"></i>
+      </div>
+      <div class="flex items-baseline gap-2">
+        <span class="text-[26px] font-semibold text-warn-400 leading-none tabular-nums" id="kpiP99">2,418</span>
+        <span class="text-[11px] text-slate-500">ms</span>
+        <span class="text-[15px] text-slate-300 tabular-nums ml-1" id="kpiP90">864</span>
+        <span class="text-[11px] text-slate-500">ms</span>
+      </div>
+      <div class="mt-2 flex items-center gap-1.5 text-[11px] text-bad-400">
+        <i class="fa-solid fa-caret-up"></i><span>+8.1%</span>
+        <span class="text-slate-500 ml-1">P99 劣化</span>
+      </div>
+    </div>
+
+    <div class="panel p-4">
+      <div class="flex items-start justify-between mb-2">
+        <span class="text-[11px] text-slate-400">错误率 · Span 失败占比</span>
+        <i class="fa-solid fa-triangle-exclamation text-bad-400 text-[13px]"></i>
+      </div>
+      <div class="flex items-baseline gap-2">
+        <span class="text-[26px] font-semibold text-bad-400 leading-none tabular-nums" id="kpiErrRate">3.72</span>
+        <span class="text-[13px] text-slate-500">%</span>
+      </div>
+      <div class="mt-2 flex items-center gap-1.5 text-[11px] text-bad-400">
+        <i class="fa-solid fa-caret-up"></i><span>+0.94pp</span>
+        <span class="text-slate-500 ml-1">超阈值 2%</span>
+      </div>
+    </div>
+
+    <div class="panel p-4">
+      <div class="flex items-start justify-between mb-2">
+        <span class="text-[11px] text-slate-400">平均质量评分</span>
+        <i class="fa-solid fa-star-half-stroke text-tool-400 text-[13px]"></i>
+      </div>
+      <div class="flex items-baseline gap-2">
+        <span class="text-[26px] font-semibold text-tool-400 leading-none tabular-nums" id="kpiQuality">0.847</span>
+        <span class="text-[11px] text-slate-500">/ 1.0</span>
+      </div>
+      <div class="mt-2 h-1 rounded-full bg-ink-750 overflow-hidden">
+        <div class="h-full bg-tool-500 rounded-full" style="width:84.7%"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="grid grid-cols-2 gap-3">
+    <div class="panel">
+      <div class="panel-hd px-4 py-2.5 flex items-center justify-between">
+        <h2 class="text-[13px] font-medium text-slate-200 flex items-center gap-2">
+          <i class="fa-solid fa-chart-area text-brand-400 text-[11px]"></i>请求吞吐量时序
+        </h2>
+        <div class="flex items-center gap-4 text-[11px] text-slate-400">
+          <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm" style="background:#4d9fff"></span>会话数</span>
+          <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm" style="background:#b18cff"></span>Span 数</span>
+        </div>
+      </div>
+      <div class="p-4" style="height:236px">
+        <canvas id="chartThroughput" role="img" aria-label="近 24 小时请求吞吐量时序曲线，含会话数与 Span 数两条序列">近 24 小时吞吐量趋势。</canvas>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-hd px-4 py-2.5 flex items-center justify-between">
+        <h2 class="text-[13px] font-medium text-slate-200 flex items-center gap-2">
+          <i class="fa-solid fa-chart-line text-bad-400 text-[11px]"></i>错误率趋势
+        </h2>
+        <div class="flex items-center gap-4 text-[11px] text-slate-400">
+          <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm" style="background:#ef4444"></span>错误率 %</span>
+          <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm" style="background:#fbbf24"></span>阈值 2%</span>
+        </div>
+      </div>
+      <div class="p-4" style="height:236px">
+        <canvas id="chartErrorRate" role="img" aria-label="近 24 小时错误率趋势折线图，含 2% 告警阈值参考线">近 24 小时错误率趋势。</canvas>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-hd px-4 py-2.5 flex items-center gap-3 flex-wrap">
+      <h2 class="text-[13px] font-medium text-slate-200 flex items-center gap-2">
+        <i class="fa-solid fa-list-ul text-brand-400 text-[11px]"></i>链路列表 · Trace
+      </h2>
+      <span class="text-[11px] px-1.5 py-0.5 rounded bg-ink-750 text-slate-400 border border-edge" id="traceCount">0</span>
+
+      <div class="flex-1"></div>
+
+      <label class="flex items-center gap-2 text-[11px] text-slate-400">
+        状态
+        <select id="filterStatus" class="bg-ink-850 border border-edge rounded-md px-2 py-1 text-[12px] text-slate-200 outline-none focus:border-brand-500 cursor-pointer">
+          <option value="all">全部</option>
+          <option value="success">success</option>
+          <option value="failed">failed</option>
+        </select>
+      </label>
+
+      <label class="flex items-center gap-2 text-[11px] text-slate-400">
+        类型
+        <select id="filterType" class="bg-ink-850 border border-edge rounded-md px-2 py-1 text-[12px] text-slate-200 outline-none focus:border-brand-500 cursor-pointer">
+          <option value="all">全部</option>
+          <option value="agent_execution">agent_execution</option>
+          <option value="llm_call">llm_call</option>
+          <option value="tool_call">tool_call</option>
+        </select>
+      </label>
+
+      <label class="flex items-center gap-2 text-[11px] text-slate-400">
+        时间范围
+        <select id="filterRange" class="bg-ink-850 border border-edge rounded-md px-2 py-1 text-[12px] text-slate-200 outline-none focus:border-brand-500 cursor-pointer">
+          <option value="15">近 15 分钟</option>
+          <option value="60" selected>近 1 小时</option>
+          <option value="360">近 6 小时</option>
+          <option value="all">全部</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="w-full text-[12px]" style="table-layout:fixed">
+        <colgroup>
+          <col style="width:32px"><col style="width:170px"><col style="width:150px"><col style="width:140px">
+          <col style="width:90px"><col style="width:92px"><col style="width:88px"><col style="width:100px"><col style="width:32px">
+        </colgroup>
+        <thead>
+          <tr class="text-[11px] text-slate-500 border-b border-edge">
+            <th class="px-3 py-2"></th>
+            <th class="text-left px-2 py-2 font-normal">SessionId</th>
+            <th class="text-left px-2 py-2 font-normal">TraceId</th>
+            <th class="text-left px-2 py-2 font-normal">Trace 类型</th>
+            <th class="text-right px-2 py-2 font-normal">耗时</th>
+            <th class="text-left px-2 py-2 font-normal">状态</th>
+            <th class="text-right px-2 py-2 font-normal">质量分</th>
+            <th class="text-left px-2 py-2 font-normal">时间</th>
+            <th class="px-2 py-2"></th>
+          </tr>
+        </thead>
+        <tbody id="traceBody"></tbody>
+      </table>
+      <div id="traceEmpty" class="hidden py-10 text-center text-[12px] text-slate-500">
+        <i class="fa-solid fa-inbox text-2xl mb-2 block opacity-40"></i>当前筛选条件下无链路数据
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-hd px-4 py-2.5 flex items-center gap-3">
+      <h2 class="text-[13px] font-medium text-slate-200 flex items-center gap-2">
+        <i class="fa-solid fa-sitemap text-tool-400 text-[11px]"></i>链路拓扑树 · Span 嵌套
+      </h2>
+      <span class="text-[11px] text-slate-500" id="topoMeta">选择上方任意链路查看</span>
+      <div class="flex-1"></div>
+      <div class="flex items-center gap-3 text-[11px] text-slate-400">
+        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm" style="background:#2b7fff"></span>Agent</span>
+        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm" style="background:#8b5cf6"></span>LLM</span>
+        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm" style="background:#22c55e"></span>Tool</span>
+        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm" style="background:#ef4444"></span>异常</span>
+      </div>
+      <button id="btnExpandAll" class="px-2 py-1 rounded border border-edge hover:border-brand-500 hover:text-brand-400 transition text-[11px]">
+        <i class="fa-solid fa-angles-down text-[10px] mr-1"></i>全展开
+      </button>
+    </div>
+
+    <div class="grid" style="grid-template-columns:minmax(0,1.25fr) minmax(0,1fr)">
+      <div id="topoTree" class="p-3 overflow-auto border-r border-edge" style="max-height:520px"></div>
+      <div id="spanDetail" class="overflow-auto" style="max-height:520px"></div>
+    </div>
+  </section>
+
+  <section class="grid gap-3" style="grid-template-columns:minmax(0,1.15fr) minmax(0,1fr)">
+    <div class="panel flex flex-col">
+      <div class="panel-hd px-4 py-2.5 flex items-center gap-3">
+        <h2 class="text-[13px] font-medium text-slate-200 flex items-center gap-2">
+          <i class="fa-solid fa-terminal text-slate-400 text-[11px]"></i>实时日志
+        </h2>
+        <div class="flex items-center gap-1.5 ml-2">
+          <button data-log="all" class="log-btn px-2 py-0.5 rounded border border-brand-500 text-brand-400 text-[10px]">全部</button>
+          <button data-log="INFO" class="log-btn px-2 py-0.5 rounded border border-edge text-slate-400 text-[10px]">INFO</button>
+          <button data-log="WARN" class="log-btn px-2 py-0.5 rounded border border-edge text-slate-400 text-[10px]">WARN</button>
+          <button data-log="ERROR" class="log-btn px-2 py-0.5 rounded border border-edge text-slate-400 text-[10px]">ERROR</button>
+        </div>
+        <div class="flex-1"></div>
+        <label class="flex items-center gap-1.5 text-[11px] text-slate-400 cursor-pointer">
+          <input type="checkbox" id="logAuto" checked class="accent-brand-500">自动滚动
+        </label>
+        <button id="btnClearLog" class="text-[11px] text-slate-500 hover:text-slate-300">清空</button>
+      </div>
+      <div id="logPanel" class="p-3 font-mono overflow-auto flex-1" style="height:300px;font-size:11.5px;line-height:1.65;background:#0d1220"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-hd px-4 py-2.5 flex items-center gap-3">
+        <h2 class="text-[13px] font-medium text-slate-200 flex items-center gap-2">
+          <i class="fa-solid fa-clipboard-check text-tool-400 text-[11px]"></i>链路评估
+        </h2>
+        <span class="text-[11px] text-slate-500 font-mono" id="evalTraceId">—</span>
+      </div>
+      <div id="evalPanel" class="p-4 overflow-auto" style="max-height:300px"></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-hd px-4 py-2.5 flex items-center gap-3">
+      <h2 class="text-[13px] font-medium text-slate-200 flex items-center gap-2">
+        <i class="fa-solid fa-bug text-warn-400 text-[11px]"></i>调试工作台
+      </h2>
+      <div class="flex items-center gap-1.5 ml-2">
+        <button data-dtab="replay" class="dbg-tab px-2.5 py-1 rounded-t border-b-2 border-transparent tab-btn on text-[11px]">状态回放</button>
+        <button data-dtab="diagnose" class="dbg-tab px-2.5 py-1 rounded-t border-b-2 border-transparent tab-btn text-[11px] text-slate-400">异常分析</button>
+      </div>
+      <div class="flex-1"></div>
+      <span class="text-[11px] text-slate-500" id="dbgMeta">—</span>
+    </div>
+    <div id="dbgReplay" class="p-4"></div>
+    <div id="dbgDiagnose" class="p-4 hidden"></div>
+  </section>
+
+  <footer class="pt-1 pb-4 text-[11px] text-slate-600 flex items-center justify-between">
+    <span>PandaProbe 可观测控制台 · 数据为模拟样本，用于界面演示</span>
+    <span class="font-mono">三级链路模型 Session → Trace → Span</span>
+  </footer>
+</main>
+
+<div id="drawerMask" class="hidden fixed inset-0 bg-black/55 z-40"></div>
+<aside id="drawer" class="drawer fixed top-0 right-0 h-full w-[620px] max-w-[92vw] bg-ink-900 border-l border-edge z-50 translate-x-full flex flex-col">
+  <div class="h-14 px-4 flex items-center gap-3 border-b border-edge shrink-0">
+    <i class="fa-solid fa-diagram-project text-brand-400 text-[12px]"></i>
+    <span class="font-medium text-slate-100 text-[13px]">链路详情</span>
+    <span class="text-[11px] font-mono text-slate-500" id="drawerTraceId">—</span>
+    <div class="flex-1"></div>
+    <button id="drawerClose" class="w-7 h-7 rounded hover:bg-ink-750 grid place-items-center text-slate-400 hover:text-slate-200">
+      <i class="fa-solid fa-xmark"></i>
+    </button>
+  </div>
+  <div id="drawerBody" class="flex-1 overflow-auto p-4 space-y-4"></div>
+</aside>
+
+<script>
+const PROJECTS = ['customer-service-agents','order-fulfillment-bot','code-review-copilot','finance-audit-agent'];
+const TRACE_TYPES = ['agent_execution','llm_call','tool_call'];
+const HOURS = Array.from({length:24},(_,i)=>String(i).padStart(2,'0')+':00');
+
+const envState = {
+  dev:  { through:[42,38,45,51,48,55,62,58,66,71,68,75,82,78,85,90,86,93,88,96,91,84,79,88],
+          span:  [186,172,201,228,214,246,278,262,295,318,305,338,368,350,382,404,386,418,395,432,410,378,354,396],
+          err:   [1.2,1.4,1.1,1.6,1.3,1.5,1.9,1.7,2.1,1.8,2.0,2.3,2.6,2.2,2.4,2.8,2.5,2.7,2.3,2.6,2.4,2.1,1.9,2.2],
+          kpi:   {throughput:'412', p99:'1,086', p90:'412', err:'2.41', quality:'0.912'} },
+  prod: { through:[1180,1120,1265,1340,1288,1395,1462,1420,1518,1596,1548,1632,1710,1675,1748,1836,1782,1864,1802,1908,1846,1772,1712,1840].map(v=>Math.round(v/1.4)),
+          span:  [5120,4980,5410,5720,5540,5960,6240,6080,6480,6820,6640,6980,7320,7160,7480,7860,7640,7960,7720,8180,7920,7620,7380,7880],
+          err:   [2.4,2.6,2.3,2.8,3.0,2.7,3.2,3.4,3.1,3.6,3.3,3.8,4.1,3.7,3.9,4.4,4.0,4.2,3.8,4.1,3.9,3.6,3.4,3.72],
+          kpi:   {throughput:'1,284', p99:'2,418', p90:'864', err:'3.72', quality:'0.847'} }
+};
+let currEnv = 'prod';
+
+function nowStr(){ const d=new Date(); return d.toTimeString().slice(0,8); }
+function todayStr(){ const d=new Date(); return d.toISOString().slice(0,10); }
+function pad(n){ return String(n).padStart(2,'0'); }
+function tsAgo(secAgo){
+  const d = new Date(Date.now()-secAgo*1000);
+  return { full: `${todayStr()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`,
+           clock: `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`, secAgo };
+}
+function hex(n){ let s=''; for(let i=0;i<n;i++) s+='0123456789abcdef'[Math.floor(Math.random()*16)]; return s; }
+function fmtMs(ms){ return ms>=1000 ? (ms/1000).toFixed(2)+'s' : ms+'ms'; }
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+const TYPEC = {
+  agent: { bg:'rgba(43,127,255,.16)', bd:'#2b7fff', tx:'#7ab8ff', label:'Agent 执行', icon:'fa-robot' },
+  llm:   { bg:'rgba(139,92,246,.16)', bd:'#8b5cf6', tx:'#c4a6ff', label:'LLM 调用', icon:'fa-brain' },
+  tool:  { bg:'rgba(34,197,94,.16)',  bd:'#22c55e', tx:'#7ee2a8', label:'工具调用', icon:'fa-screwdriver-wrench' },
+  err:   { bg:'rgba(239,68,68,.16)',  bd:'#ef4444', tx:'#ff8b8b', label:'异常', icon:'fa-circle-exclamation' }
+};
+
+let sidSeq = 0;
+function mkSpan(type, name, opts={}){
+  return {
+    id: 'sp-' + hex(6), sid: 'sid-' + hex(4),
+    type, name,
+    start: 0, dur: opts.dur || 100, status: opts.status || 'success',
+    input: opts.input || '{}', output: opts.output || '{}',
+    error: opts.error || null,
+    tokens: opts.tokens || null,
+    attrs: opts.attrs || {},
+    children: opts.children || [],
+    collapsed: false,
+    self: opts.self || null,
+    p99: opts.p99 || false
+  };
+}
+
+function buildTraces(){
+  const out = [];
+  const specs = [
+    { type:'agent_execution', status:'failed',  quality:0.31, dur:4186, ago:42,    sess:'sess-a1f9c204', bad:true },
+    { type:'agent_execution', status:'success', quality:0.94, dur:1862, ago:186,   sess:'sess-7d3e8810' },
+    { type:'llm_call',        status:'success', quality:0.89, dur:946,  ago:455,   sess:'sess-4c02ba7e' },
+    { type:'agent_execution', status:'success', quality:0.91, dur:2418, ago:742,   sess:'sess-e95f1d33' },
+    { type:'tool_call',       status:'failed',  quality:0.44, dur:1820, ago:1288,  sess:'sess-2b71ee40', bad2:true },
+    { type:'agent_execution', status:'success', quality:0.96, dur:1524, ago:1690,  sess:'sess-88c4a019' },
+    { type:'llm_call',        status:'success', quality:0.83, dur:1184, ago:2340,  sess:'sess-5fa3c762' },
+    { type:'agent_execution', status:'success', quality:0.88, dur:3126, ago:3120,  sess:'sess-c017d8b5' },
+    { type:'tool_call',       status:'success', quality:0.97, dur:412,  ago:4180,  sess:'sess-3ea9f201' },
+    { type:'agent_execution', status:'success', quality:0.90, dur:2044, ago:5640,  sess:'sess-6b5ac47f' },
+    { type:'llm_call',        status:'failed',  quality:0.38, dur:2640, ago:9520,  sess:'sess-9d21b088', bad2:true },
+    { type:'agent_execution', status:'success', quality:0.93, dur:1698, ago:14800, sess:'sess-f47e0c96' }
+  ];
+
+  specs.forEach((sp, i) => {
+    const t = tsAgo(sp.ago);
+    const tid = 'tr-' + hex(8);
+    let spans;
+
+    if (sp.bad) {
+      spans = [ mkSpan('agent', 'OrchestratorAgent.execute', { dur:sp.dur, status:'failed', tokens:{in:2841,out:612},
+        input:'{"goal":"处理用户退款争议并生成安抚话术","userId":"U-88213","orderId":"ORD-20260913-4471","locale":"zh-CN"}',
+        output:'{"status":"aborted","stage":"tool_retry_exhausted","partial_reply":"已为您查询到订单…"}',
+        error:'ToolExecutionException: query_refund_eligibility failed after 3 retries\n  at ToolInvoker.invoke(ToolInvoker.java:184)\n  at AgentReActLoop.executeAction(AgentReActLoop.java:412)\nCaused by: HttpTimeoutException: Request to https://internal-api.finance.svc/refund/eligibility timed out after 3000ms\n  at HttpClientImpl.send(HttpClientImpl.java:293)',
+        attrs:{ 'agent.model':'gpt-4o-2026-08','agent.max_iterations':'8','agent.iterations_used':'5','deployment.region':'cn-hangzhou','gen_ai.system':'openai' },
+        children:[
+          mkSpan('llm','PlanningStep.reason', { dur:1120, tokens:{in:1240,out:318}, start:18,
+            input:'{"messages":3,"tools":12,"temperature":0.2}',
+            output:'{"llm_output":"需要先查询订单状态，再校验退款资格","tool_calls":1,"model":"gpt-4o-2026-08"}',
+            attrs:{'usage.prompt_tokens':'1240','usage.completion_tokens':'318','finish_reason':'tool_calls'} }),
+          mkSpan('tool','query_order_status', { dur:286, start:1150,
+            input:'{"orderId":"ORD-20260913-4471"}',
+            output:'{"orderId":"ORD-20260913-4471","status":"DELIVERED","amount":1288.00,"paidAt":"2026-09-08T10:22:31Z","refundable":true}',
+            attrs:{'tool.name':'query_order_status','tool.source':'mcp','retry.count':'0','http.status_code':'200'} }),
+          mkSpan('llm','PlanningStep.reason', { dur:894, tokens:{in:1386,out:204}, start:1450,
+            input:'{"messages":5,"tools":12,"temperature":0.2}',
+            output:'{"llm_output":"订单已送达且可退，调用退款资格校验","tool_calls":1}',
+            attrs:{'usage.prompt_tokens':'1386','usage.completion_tokens':'204','finish_reason':'tool_calls'} }),
+          mkSpan('tool','query_refund_eligibility', { dur:3000, status:'failed', start:2360, p99:true,
+            input:'{"orderId":"ORD-20260913-4471","reason":"NOT_SATISFIED"}\n// retry 1/3 → timeout\n// retry 2/3 → timeout\n// retry 3/3 → timeout',
+            output:'{"error":"upstream timeout"}',
+            error:'HttpTimeoutException: Request to https://internal-api.finance.svc/refund/eligibility timed out after 3000ms (attempt 3/3)\n  at HttpToolClient.execute(HttpToolClient.java:212)\n  at ToolInvoker.invoke(ToolInvoker.java:171)',
+            attrs:{'tool.name':'query_refund_eligibility','tool.source':'http','retry.count':'3','retry.exhausted':'true','http.status_code':'-','timeout.ms':'3000','error.type':'HttpTimeoutException'} }),
+          mkSpan('agent','SubAgent.EscalationAgent', { dur:620, start:5390,
+            input:'{"task":"生成安抚话术并升级人工工单","context":{"orderId":"ORD-20260913-4471"}}',
+            output:'{"escalated":true,"ticketId":"TK-99301","script":"已为您查询到订单，客服将在 5 分钟内联系您"}',
+            attrs:{'agent.type':'sub_agent','agent.parent':'OrchestratorAgent','agent.depth':'2','handoff.reason':'tool_unavailable'} })
+        ]})
+      ];
+    } else if (sp.bad2) {
+      spans = [ mkSpan('agent', 'OrchestratorAgent.execute', { dur:sp.dur, status:'failed', tokens:{in:1920,out:402},
+        input:'{"goal":"核对发票信息并归档","userId":"U-51704","invoiceNo":"INV-8821063"}',
+        output:'{"status":"failed","failed_stage":"llm_parse"}',
+        error:'ModelResponseParseException: Unable to parse model output as JSON\nRaw: "抱歉，我无法访问该发票…<truncated>"\n  at JsonResponseDecoder.decode(JsonResponseDecoder.java:97)\n  at LlmStepExecutor.parse(LlmStepExecutor.java:233)',
+        attrs:{'agent.model':'gpt-4o-mini','agent.iterations_used':'2','deployment.region':'cn-shanghai'},
+        children:[
+          mkSpan('llm','PlanningStep.reason', { dur:1320, tokens:{in:880,out:640}, start:12,
+            input:'{"messages":2,"tools":5,"temperature":0.7}',
+            output:'{"llm_output":"抱歉，我无法访问该发票信息，请提供更多细节…","tool_calls":0}',
+            error:'ModelResponseParseException: output is not valid JSON (finish_reason=stop, output_len=640)',
+            attrs:{'usage.prompt_tokens':'880','usage.completion_tokens':'640','finish_reason':'stop','parse.error':'invalid_json','output.schema':'strict'} })
+        ]})
+      ];
+    } else if (sp.type === 'llm_call') {
+      spans = [ mkSpan('llm','ChatCompletion.invoke', { dur:sp.dur, tokens:{in:1642,out:508},
+        input:'{"model":"gpt-4o-2026-08","messages":4,"temperature":0.2,"stream":true}',
+        output:'{"content":"您的订单 ORD-20260913-4471 已于 9 月 8 日签收…","finish_reason":"stop"}',
+        attrs:{'gen_ai.system':'openai','gen_ai.request.model':'gpt-4o-2026-08','usage.prompt_tokens':'1642','usage.completion_tokens':'508','usage.total_tokens':'2150','gen_ai.usage.cost.usd':'0.0142','stream.first_token.ms':'318'} })
+      ];
+    } else if (sp.type === 'tool_call') {
+      spans = [ mkSpan('tool','batch_enrich_records', { dur:sp.dur,
+        input:'{"recordIds":["R-001","R-002","R-003","R-004","R-005"],"fields":["risk","owner"]}',
+        output:'{"enriched":5,"failed":0,"elapsedMs":'+sp.dur+'}',
+        attrs:{'tool.name':'batch_enrich_records','tool.batch_size':'5','tool.success_rate':'100%','http.status_code':'200'} })
+      ];
+    } else {
+      spans = [ mkSpan('agent','OrchestratorAgent.execute', { dur:sp.dur, tokens:{in:2140,out:486},
+        input:'{"goal":"查询订单并解答物流进度","userId":"U-33412","orderId":"ORD-20260912-8890","locale":"zh-CN"}',
+        output:'{"status":"completed","reply":"您的包裹已在派送中，预计今日 18:00 前送达。","iterations":2}',
+        attrs:{'agent.model':'gpt-4o-2026-08','agent.iterations_used':'2','deployment.region':'cn-hangzhou'},
+        children:[
+          mkSpan('llm','PlanningStep.reason', { dur:742, tokens:{in:1080,out:212}, start:14,
+            input:'{"messages":2,"tools":12,"temperature":0.2}',
+            output:'{"llm_output":"需查询订单物流状态","tool_calls":1}',
+            attrs:{'usage.prompt_tokens':'1080','usage.completion_tokens':'212','finish_reason':'tool_calls'} }),
+          mkSpan('tool','query_logistics', { dur:368, start:772,
+            input:'{"orderId":"ORD-20260912-8890"}',
+            output:'{"carrier":"SF-Express","trackingNo":"SF1029384756","latest":"派送中 · 预计 18:00 送达","nodes":4}',
+            attrs:{'tool.name':'query_logistics','tool.source':'mcp','http.status_code':'200'} }),
+          mkSpan('llm','AnswerCompose', { dur:636, tokens:{in:1204,out:274}, start:1160,
+            input:'{"messages":4,"temperature":0.3}',
+            output:'{"content":"您的包裹已在派送中，预计今日 18:00 前送达。"}',
+            attrs:{'usage.prompt_tokens':'1204','usage.completion_tokens':'274','finish_reason':'stop'} })
+        ]})
+      ];
+    }
+
+    out.push({ traceId:tid, sessionId:sp.sess || ('sess-' + hex(6)), type:sp.type, status:sp.status,
+               dur:sp.dur, quality:sp.quality, ts:t, spans });
+  });
+  return out;
+}
+let TRACES = buildTraces();
+
+const evalStore = {
+  'tr-bad1': { toolRate:0.667, relevance:0.28, compliance:'failed', violations:[
+      {sev:'high', rule:'SLA·响应时效', detail:'退款资格校验超时 3 次重试（累计 9.0s），违反 P95 ≤ 3s 承诺'},
+      {sev:'high', rule:'业务·兜底路径', detail:'工具不可用后未触发降级策略，直接中断且未向用户交付替代方案'},
+      {sev:'medium', rule:'合规·话术规范', detail:'部分回复缺失"如仍有疑问请联系人工客服"兜底话术'}
+    ], note:'链路在 query_refund_eligibility 处故障，导致 4/6 个 Span 未能正常完成。' },
+  'tr-bad2': { toolRate:1.0, relevance:0.34, compliance:'warning', violations:[
+      {sev:'high', rule:'结构·输出契约', detail:'模型输出未命中 strict JSON Schema，解析器抛 ModelResponseParseException'},
+      {sev:'medium', rule:'质量·意图偏离', detail:'用户目标为"核对发票并归档"，模型回复为拒答话术，意图相关性仅 0.34'}
+    ], note:'主因是 temperature=0.7 与 strict JSON 约束冲突，模型倾向生成自由文本。' },
+  'default-success': { toolRate:1.0, relevance:0.93, compliance:'passed', violations:[],
+      note:'链路各 Span 均正常完成，工具调用与输出契约校验通过。' },
+  'default-tool-fail': { toolRate:0.5, relevance:0.61, compliance:'warning', violations:[
+      {sev:'medium', rule:'业务·数据完整性', detail:'批量补全 5 条记录中 2 条字段缺失，未触发补偿重试'}
+    ], note:'工具返回部分成功，链路未对缺失字段做二次校验。' }
+};
+
+function evalFor(tr){
+  if (!tr) return evalStore['default-success'];
+  if (tr.status === 'failed' && tr.type === 'agent_execution') {
+    const hasToolFail = JSON.stringify(tr.spans).includes('query_refund_eligibility');
+    if (hasToolFail) return evalStore['tr-bad1'];
+    if (JSON.stringify(tr.spans).includes('invalid_json')) return evalStore['tr-bad2'];
+    return evalStore['tr-bad2'];
+  }
+  if (tr.status === 'failed') return evalStore['default-tool-fail'];
+  return evalStore['default-success'];
+}
+
+const findBadSpan = (nodes) => {
+  for (const n of nodes){
+    if (n.status === 'failed') return n;
+    const r = findBadSpan(n.children);
+    if (r) return r;
+  }
+  return null;
+};
+const countSpans = (nodes) => nodes.reduce((a,n)=>a+1+countSpans(n.children),0);
+
+const DIAGNOSE = {
+  HttpTimeoutException: {
+    root:'工具 query_refund_eligibility 依赖的下游 HTTP 服务响应超过 3000ms 超时阈值，3 次重试全部失败，导致 ReAct 循环无法获得必要输入而在第 5 轮中止。',
+    evidence:[
+      'Span query_refund_eligibility 耗时 3000ms，恰好等于配置超时上限（timeout.ms=3000），呈硬截断特征',
+      'retry.count=3 且 retry.exhausted=true —— 说明是持续性超时而非偶发抖动',
+      '前一个工具 query_order_status 仅 286ms，可排除调用方网络与序列化开销',
+      '该 Span 的 P99 分位标记为红色，在近 1 小时内属最慢 1% 请求'
+    ],
+    fixes:[
+      {p:'P0', t:'核对下游服务容量', d:'调用 /refund/eligibility 的 P99 已从 780ms 升至 3.1s，优先确认上游是否扩容/异常，或是否命中数据库慢查询。'},
+      {p:'P1', t:'调整超时与重试策略', d:'超时 3000ms → 6000ms，重试 3 次 → 2 次并改用指数退避（200ms/600ms），避免重试风暴放大下游压力。'},
+      {p:'P1', t:'补充降级路径', d:'工具不可用时不应直接中断。建议回退到"查询缓存资格结果"或直接升级人工工单（当前 EscalationAgent 已在链路中，但触发时机偏晚）。'}
+    ],
+    code:`// 建议：为易超时工具声明降级链\n@ToolPolicy(\n    timeoutMs = 6000,\n    retry = @Retry(times = 2, backoff = Backoff.EXPONENTIAL, initialDelayMs = 200),\n    fallback = RefundEligibilityCachedProvider.class\n)\npublic RefundEligibility queryRefundEligibility(String orderId) { ... }`
+  },
+  ModelResponseParseException: {
+    root:'模型在 temperature=0.7 下生成了自然语言拒答文本，而解码器期望 strict JSON，导致解析失败使整条链路在第 2 轮中止。',
+    evidence:[
+      'Span PlanningStep.reason 的 finish_reason=stop 且 output_len=640，说明模型正常结束但内容不符合格式',
+      'parse.error=invalid_json，output.schema=strict —— 约束与采样温度存在内在冲突',
+      'agent.iterations_used=2，说明链路在早期即中断，未进入工具调用阶段',
+      'temperature=0.7 明显偏离同类链路惯用的 0.2，疑似配置回退到默认值'
+    ],
+    fixes:[
+      {p:'P0', t:'启用结构化输出并降低温度', d:'改用 response_format=json_schema 并由服务端强约束，temperature 从 0.7 降至 0.2。'},
+      {p:'P1', t:'解析失败增加一次自修复重试', d:'解析异常时把原始输出回灌给模型并要求"仅返回 JSON"，可挽回大部分格式类失败，而非直接抛错。'},
+      {p:'P2', t:'审计配置来源', d:'该链路 temperature 与其他链路不一致，建议排查配置中心是否缺失该 agent 的覆盖值。'}
+    ],
+    code:`// 建议：结构化输出 + 解析自愈\nconst resp = model.generate(\n    prompt,\n    GenerateOptions.builder()\n        .temperature(0.2)\n        .responseFormat(ResponseFormat.jsonSchema(PLAN_SCHEMA))\n        .build()\n);\ntry {\n    return decoder.decode(resp);\n} catch (ModelResponseParseException e) {\n    return decoder.decode(model.repair(resp, PLAN_SCHEMA));\n}`
+  },
+  ToolPartialFailure: {
+    root:'批量工具返回部分成功（5 条中 2 条字段缺失），链路未对缺失字段做补偿校验，直接把不完整数据交给下游。',
+    evidence:[
+      'Span batch_enrich_records 的 tool.success_rate 为 100%（HTTP 层成功），但业务层 enriched=3/5',
+      '工具返回体缺少 per-record 的失败明细，调用方无法感知哪些记录降级',
+      '链路中不存在针对缺失字段的校验 Span'
+    ],
+    fixes:[
+      {p:'P1', t:'工具返回体补全失败明细', d:'返回 {enriched:5, failed:[{id,reason}]}，让调用方可判断是否需要补偿。'},
+      {p:'P2', t:'增加输出校验 Span', d:'在工具后插入 validate_records Span，对必填字段做断言，失败时触发重试。'}
+    ],
+    code:`// 建议：工具返回体带上失败明细\nreturn BatchResult.builder()\n    .enriched(success.size())\n    .failed(failed.stream()\n        .map(f -> new Failure(f.id(), f.reason()))\n        .toList())\n    .build();`
+  }
+};
+
+function diagnoseFor(tr){
+  if (!tr) return null;
+  const bad = findBadSpan(tr.spans);
+  if (!bad) return null;
+  if (bad.error && bad.error.includes('HttpTimeoutException')) return DIAGNOSE.HttpTimeoutException;
+  if (bad.error && bad.error.includes('ModelResponseParseException')) return DIAGNOSE.ModelResponseParseException;
+  if (tr.spans.some(s => JSON.stringify(s).includes('batch_enrich_records'))) return DIAGNOSE.ToolPartialFailure;
+  return DIAGNOSE.HttpTimeoutException;
+}
+
+const $ = (s) => document.querySelector(s);
+
+let selectedTrace = null;
+let selectedSpanId = null;
+let logFilter = 'all';
+let logLines = [];
+let replayTimer = null;
+
+function clockTick(){ $('#clock').textContent = nowStr(); }
+clockTick(); setInterval(clockTick, 1000);
+
+function setEnv(env){
+  currEnv = env;
+  document.querySelectorAll('.env-btn').forEach(b => {
+    const on = b.dataset.env === env;
+    b.className = 'env-btn px-2.5 py-1 rounded text-[11px] font-medium ' +
+      (on ? 'bg-brand-600 text-white' : 'text-slate-400 hover:text-slate-200');
+  });
+  const k = envState[env].kpi;
+  $('#kpiThroughput').textContent = k.throughput;
+  $('#kpiP99').textContent = k.p99;
+  $('#kpiP90').textContent = k.p90;
+  $('#kpiErrRate').textContent = k.err;
+  $('#kpiQuality').textContent = k.quality;
+  renderCharts(envState[env]);
+  pushLog('INFO', 'environment', `已切换到 ${env === 'prod' ? '生产' : '开发'} 环境，重新拉取链路数据`);
+}
+
+let chThroughput = null, chError = null;
+function renderCharts(d){
+  const grid = { color:'rgba(58,71,95,.5)' };
+  const ticks = { color:'#8b95a8', font:{ size:10 } };
+
+  if (chThroughput) chThroughput.destroy();
+  const ctx1 = $('#chartThroughput').getContext('2d');
+  const g1 = ctx1.createLinearGradient(0,0,0,200);
+  g1.addColorStop(0,'rgba(77,159,255,.34)'); g1.addColorStop(1,'rgba(77,159,255,.02)');
+  const g2 = ctx1.createLinearGradient(0,0,0,200);
+  g2.addColorStop(0,'rgba(177,140,255,.28)'); g2.addColorStop(1,'rgba(177,140,255,.02)');
+  chThroughput = new Chart(ctx1, {
+    type:'line',
+    data:{ labels:HOURS, datasets:[
+      { label:'会话数', data:d.through, borderColor:'#4d9fff', backgroundColor:g1, fill:true,
+        tension:.38, borderWidth:2, pointRadius:0, pointHoverRadius:4, pointHoverBackgroundColor:'#4d9fff' },
+      { label:'Span 数', data:d.span.map(v=>Math.round(v)),
+        borderColor:'#b18cff', backgroundColor:g2, fill:true,
+        tension:.38, borderWidth:2, borderDash:[5,3], pointRadius:0, pointHoverRadius:4, pointHoverBackgroundColor:'#b18cff',
+        yAxisID:'y1' }
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false, interaction:{ mode:'index', intersect:false },
+      plugins:{ legend:{ display:false }, tooltip:{ backgroundColor:'#0f1420', borderColor:'#243044',
+        borderWidth:1, titleColor:'#e2e8f0', bodyColor:'#cbd5e1', padding:10, displayColors:true, boxWidth:8, boxHeight:8 } },
+      scales:{
+        x:{ grid, ticks:{ ...ticks, maxTicksLimit:12, autoSkip:false, maxRotation:0 }, border:{ color:'#243044' } },
+        y:{ position:'left', grid, ticks, border:{ color:'#243044' },
+            title:{ display:true, text:'会话数', color:'#64748b', font:{ size:10 } } },
+        y1:{ position:'right', grid:{ drawOnChartArea:false }, ticks, border:{ color:'#243044' },
+            title:{ display:true, text:'Span 数', color:'#64748b', font:{ size:10 } } }
+      } }
+  });
+
+  if (chError) chError.destroy();
+  const ctx2 = $('#chartErrorRate').getContext('2d');
+  const g3 = ctx2.createLinearGradient(0,0,0,200);
+  g3.addColorStop(0,'rgba(239,68,68,.30)'); g3.addColorStop(1,'rgba(239,68,68,.02)');
+  chError = new Chart(ctx2, {
+    type:'line',
+    data:{ labels:HOURS, datasets:[
+      { label:'错误率 %', data:d.err, borderColor:'#ef4444', backgroundColor:g3, fill:true,
+        tension:.34, borderWidth:2, pointRadius:0, pointHoverRadius:4, pointHoverBackgroundColor:'#ef4444' },
+      { label:'阈值 2%', data:HOURS.map(()=>2), borderColor:'#fbbf24',
+        borderWidth:1.5, borderDash:[6,4], pointRadius:0, fill:false }
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false, interaction:{ mode:'index', intersect:false },
+      plugins:{ legend:{ display:false }, tooltip:{ backgroundColor:'#0f1420', borderColor:'#243044',
+        borderWidth:1, titleColor:'#e2e8f0', bodyColor:'#cbd5e1', padding:10,
+        callbacks:{ label:(c)=> c.dataset.label + ': ' + c.parsed.y + '%' } } },
+      scales:{
+        x:{ grid, ticks:{ ...ticks, maxTicksLimit:12, autoSkip:false, maxRotation:0 }, border:{ color:'#243044' } },
+        y:{ grid, ticks:{ ...ticks, callback:(v)=>v+'%' }, border:{ color:'#243044' },
+            title:{ display:true, text:'错误率', color:'#64748b', font:{ size:10 } } }
+      } }
+  });
+}
+
+function statusTag(st){
+  return st === 'success'
+    ? '<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium" style="background:rgba(34,197,94,.16);color:#7ee2a8"><i class="fa-solid fa-circle-check text-[9px]"></i>success</span>'
+    : '<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium" style="background:rgba(239,68,68,.16);color:#ff8b8b"><i class="fa-solid fa-circle-xmark text-[9px]"></i>failed</span>';
+}
+function typeTag(tp){
+  const map = { agent_execution:['agent','#2b7fff','fa-robot'], llm_call:['llm','#8b5cf6','fa-brain'], tool_call:['tool','#22c55e','fa-screwdriver-wrench'] };
+  const [lab,c,ic] = map[tp] || ['agent','#2b7fff','fa-robot'];
+  return `<span class="inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[10.5px] font-mono" style="background:${c}22;color:${c}dd"><i class="fa-solid ${ic} text-[9px]"></i>${tp}</span>`;
+}
+function qualityCell(q){
+  const c = q >= 0.85 ? '#22c55e' : q >= 0.6 ? '#fbbf24' : '#ef4444';
+  return `<div class="flex items-center gap-2 justify-end">
+    <div class="w-10 h-1 rounded-full bg-ink-750 overflow-hidden"><div style="width:${q*100}%;background:${c}" class="h-full rounded-full"></div></div>
+    <span class="tabular-nums font-mono" style="color:${c}">${q.toFixed(2)}</span></div>`;
+}
+
+function renderTraceTable(){
+  const st = $('#filterStatus').value, tp = $('#filterType').value, rg = $('#filterRange').value;
+  const rows = TRACES.filter(t => {
+    if (st !== 'all' && t.status !== st) return false;
+    if (tp !== 'all' && t.type !== tp) return false;
+    if (rg !== 'all' && t.ts.secAgo > Number(rg) * 60) return false;
+    return true;
+  });
+  $('#traceCount').textContent = rows.length + ' / ' + TRACES.length;
+  $('#traceBody').innerHTML = rows.map(t => {
+    const hasBad = t.status === 'failed';
+    return `<tr class="tr-row cursor-pointer border-b border-edge/60 transition ${selectedTrace && selectedTrace.traceId === t.traceId ? 'sel' : ''}" data-trace="${t.traceId}">
+      <td class="px-3 py-2 text-center">${hasBad
+        ? '<span class="inline-block w-1.5 h-1.5 rounded-full bg-bad-500"></span>'
+        : '<span class="inline-block w-1.5 h-1.5 rounded-full bg-tool-500/70"></span>'}</td>
+      <td class="px-2 py-2 font-mono text-[11px] text-slate-400 truncate" title="${t.sessionId}">${t.sessionId}</td>
+      <td class="px-2 py-2 font-mono text-[11px] text-brand-400 truncate" title="${t.traceId}">${t.traceId}</td>
+      <td class="px-2 py-2">${typeTag(t.type)}</td>
+      <td class="px-2 py-2 text-right tabular-nums font-mono ${t.dur > 2500 ? 'text-warn-400' : 'text-slate-300'}">${fmtMs(t.dur)}</td>
+      <td class="px-2 py-2">${statusTag(t.status)}</td>
+      <td class="px-2 py-2">${qualityCell(t.quality)}</td>
+      <td class="px-2 py-2 font-mono text-[11px] text-slate-500">${t.ts.clock}</td>
+      <td class="px-2 py-2 text-slate-600"><i class="fa-solid fa-chevron-right text-[10px]"></i></td>
+    </tr>`;
+  }).join('');
+  $('#traceEmpty').classList.toggle('hidden', rows.length > 0);
+  $('#traceBody').querySelectorAll('tr').forEach(tr => {
+    tr.addEventListener('click', () => {
+      const t = TRACES.find(x => x.traceId === tr.dataset.trace);
+      selectTrace(t, true);
+    });
+  });
+}
+
+function colorOf(sp){
+  if (sp.status === 'failed') return TYPEC.err;
+  return sp.type === 'agent' ? TYPEC.agent : sp.type === 'llm' ? TYPEC.llm : TYPEC.tool;
+}
+
+function renderTree(nodes, depth){
+  return nodes.map(sp => {
+    const c = colorOf(sp);
+    const kids = sp.children || [];
+    const hasKids = kids.length > 0;
+    const collapsed = sp.collapsed;
+    const sel = selectedSpanId === sp.id;
+    const tok = sp.tokens ? `<span class="text-[10px] font-mono text-slate-500 ml-1"><i class="fa-solid fa-coins text-[9px]"></i> ${sp.tokens.in + sp.tokens.out}</span>` : '';
+    return `
+    <div>
+      <div class="tot-node ${sel ? 'sel' : ''} ${sp.status === 'failed' ? 'err' : ''} flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer group"
+           data-span="${sp.id}" style="margin-left:${depth * 18}px">
+        ${hasKids
+          ? `<i class="fa-solid fa-chevron-down chev ${collapsed ? 'collapsed' : ''} text-[9px] text-slate-500 w-3 shrink-0" data-toggle="${sp.id}"></i>`
+          : '<span class="w-3 shrink-0"></span>'}
+        <span class="w-5 h-5 rounded grid place-items-center shrink-0" style="background:${c.bg};border:1px solid ${c.bd}44">
+          <i class="fa-solid ${c.icon} text-[9px]" style="color:${c.tx}"></i></span>
+        <span class="text-[12px] ${sp.status === 'failed' ? 'text-bad-400' : 'text-slate-200'} truncate" style="max-width:230px" title="${esc(sp.name)}">${esc(sp.name)}</span>
+        <span class="text-[10px] font-mono text-slate-500 shrink-0">${sp.sid}</span>
+        <div class="flex-1"></div>
+        ${sp.p99 ? '<span class="text-[9px] px-1 rounded bg-bad-500/20 text-bad-400 border border-bad-500/40 shrink-0">P99</span>' : ''}
+        ${tok}
+        <span class="text-[10.5px] font-mono tabular-nums shrink-0 ${sp.dur > 2000 ? 'text-warn-400' : 'text-slate-400'}">${fmtMs(sp.dur)}</span>
+        <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background:${sp.status === 'failed' ? '#ef4444' : '#22c55e'}"></span>
+      </div>
+      ${hasKids && !collapsed ? `<div class="border-l border-edge/70" style="margin-left:${depth * 18 + 8}px">${renderTree(kids, depth + 1)}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function findSpan(nodes, id){
+  for (const n of nodes){
+    if (n.id === id) return n;
+    const r = findSpan(n.children, id);
+    if (r) return r;
+  }
+  return null;
+}
+
+function renderTopo(){
+  if (!selectedTrace){
+    $('#topoTree').innerHTML = '<div class="py-16 text-center text-[12px] text-slate-500"><i class="fa-solid fa-hand-pointer text-2xl block mb-2 opacity-40"></i>点击上方链路列表中的任意一行<br><span class="text-slate-600">以查看 Span 嵌套拓扑</span></div>';
+    $('#spanDetail').innerHTML = '';
+    $('#topoMeta').textContent = '选择上方任意链路查看';
+    return;
+  }
+  $('#topoMeta').innerHTML = `<span class="font-mono text-brand-400">${selectedTrace.traceId}</span> · ${countSpans(selectedTrace.spans)} 个 Span · 根类型 ${selectedTrace.type}`;
+  $('#topoTree').innerHTML = renderTree(selectedTrace.spans, 0);
+
+  $('#topoTree').querySelectorAll('[data-toggle]').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const sp = findSpan(selectedTrace.spans, el.dataset.toggle);
+      sp.collapsed = !sp.collapsed;
+      renderTopo();
+    });
+  });
+  $('#topoTree').querySelectorAll('[data-span]').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      selectedSpanId = el.dataset.span;
+      renderTopo();
+    });
+  });
+
+  if (!selectedSpanId) {
+    const bad = findBadSpan(selectedTrace.spans);
+    selectedSpanId = bad ? bad.id : selectedTrace.spans[0].id;
+  }
+  renderSpanDetail();
+}
+
+function renderSpanDetail(){
+  const sp = findSpan(selectedTrace.spans, selectedSpanId);
+  if (!sp){ $('#spanDetail').innerHTML = ''; return; }
+  const c = colorOf(sp);
+  const tok = sp.tokens;
+  const attrRows = Object.entries(sp.attrs).map(([k,v]) =>
+    `<tr><td class="py-1 pr-3 text-slate-500 font-mono text-[11px] align-top whitespace-nowrap">${esc(k)}</td>
+     <td class="py-1 text-slate-300 font-mono text-[11px] break-all">${esc(v)}</td></tr>`).join('');
+
+  $('#spanDetail').innerHTML = `
+  <div class="p-4 space-y-3 fade-in">
+    <div class="flex items-center gap-2">
+      <span class="w-6 h-6 rounded grid place-items-center shrink-0" style="background:${c.bg};border:1px solid ${c.bd}55">
+        <i class="fa-solid ${c.icon} text-[10px]" style="color:${c.tx}"></i></span>
+      <div class="min-w-0">
+        <div class="text-[13px] font-medium ${sp.status === 'failed' ? 'text-bad-400' : 'text-slate-100'} truncate">${esc(sp.name)}</div>
+        <div class="text-[10px] font-mono text-slate-500">${c.label} · ${sp.sid}</div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-3 gap-2">
+      <div class="bg-ink-850 rounded-md p-2">
+        <div class="text-[10px] text-slate-500 mb-0.5">耗时</div>
+        <div class="text-[13px] font-mono tabular-nums ${sp.dur > 2000 ? 'text-warn-400' : 'text-slate-200'}">${fmtMs(sp.dur)}</div>
+      </div>
+      <div class="bg-ink-850 rounded-md p-2">
+        <div class="text-[10px] text-slate-500 mb-0.5">状态</div>
+        <div class="text-[13px]">${statusTag(sp.status)}</div>
+      </div>
+      <div class="bg-ink-850 rounded-md p-2">
+        <div class="text-[10px] text-slate-500 mb-0.5">Token</div>
+        <div class="text-[13px] font-mono tabular-nums text-slate-200">${tok ? (tok.in+tok.out) : '—'}</div>
+      </div>
+    </div>
+
+    ${tok ? `
+    <div class="bg-ink-850 rounded-md p-2.5">
+      <div class="text-[10px] text-slate-500 mb-1.5">Token 消耗明细</div>
+      <div class="flex items-center gap-3 text-[11px] font-mono">
+        <span class="text-slate-400">prompt <b class="text-brand-400">${tok.in}</b></span>
+        <span class="text-slate-400">completion <b class="text-llm-400">${tok.out}</b></span>
+        <div class="flex-1 h-1.5 rounded-full bg-ink-750 overflow-hidden flex">
+          <div style="width:${(tok.in/(tok.in+tok.out)*100).toFixed(1)}%;background:#4d9fff" class="h-full"></div>
+          <div style="width:${(tok.out/(tok.in+tok.out)*100).toFixed(1)}%;background:#b18cff" class="h-full"></div>
+        </div>
+      </div>
+    </div>` : ''}
+
+    <div>
+      <div class="text-[11px] text-slate-400 mb-1.5 flex items-center gap-1.5"><i class="fa-solid fa-arrow-right-to-bracket text-[10px] text-slate-500"></i>输入参数</div>
+      <pre class="code text-slate-300">${esc(sp.input)}</pre>
+    </div>
+    <div>
+      <div class="text-[11px] text-slate-400 mb-1.5 flex items-center gap-1.5"><i class="fa-solid fa-arrow-right-from-bracket text-[10px] text-slate-500"></i>输出结果</div>
+      <pre class="code text-slate-300">${esc(sp.output)}</pre>
+    </div>
+
+    ${sp.error ? `
+    <div>
+      <div class="text-[11px] text-bad-400 mb-1.5 flex items-center gap-1.5"><i class="fa-solid fa-triangle-exclamation text-[10px]"></i>错误堆栈</div>
+      <pre class="code" style="color:#ff8b8b;border-color:rgba(239,68,68,.35);background:rgba(239,68,68,.06)">${esc(sp.error)}</pre>
+    </div>` : ''}
+
+    <div>
+      <div class="text-[11px] text-slate-400 mb-1.5 flex items-center gap-1.5"><i class="fa-solid fa-tags text-[10px] text-slate-500"></i>自定义属性</div>
+      <div class="bg-ink-850 rounded-md p-2.5">
+        <table class="w-full"><tbody>${attrRows || '<tr><td class="text-slate-500 text-[11px]">无</td></tr>'}</tbody></table>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderEval(){
+  const e = evalFor(selectedTrace);
+  $('#evalTraceId').textContent = selectedTrace ? selectedTrace.traceId : '—';
+  const rel = selectedTrace ? (e.relevance || 0) : 0;
+  const bar = (v, col) => `<div class="h-1.5 rounded-full bg-ink-750 overflow-hidden"><div style="width:${(v*100).toFixed(0)}%;background:${col}" class="h-full rounded-full"></div></div>`;
+  const sevTag = (s) => s === 'high' ? '<span class="text-[9px] px-1 py-0.5 rounded bg-bad-500/20 text-bad-400 border border-bad-500/40 shrink-0">高</span>'
+                                       : s === 'medium' ? '<span class="text-[9px] px-1 py-0.5 rounded bg-warn-500/20 text-warn-400 border border-warn-500/40 shrink-0">中</span>'
+                                       : '<span class="text-[9px] px-1 py-0.5 rounded bg-ink-700 text-slate-400 shrink-0">低</span>';
+  const compMap = { passed:['#22c55e','通过','fa-circle-check'], warning:['#fbbf24','告警','fa-triangle-exclamation'], failed:['#ef4444','未通过','fa-circle-xmark'] };
+  const [cc, cl, ci] = compMap[e.compliance];
+
+  $('#evalPanel').innerHTML = `
+  <div class="space-y-4 fade-in">
+    <div class="grid grid-cols-3 gap-2.5">
+      <div class="bg-ink-850 rounded-md p-2.5">
+        <div class="text-[10px] text-slate-500 mb-1">工具调用成功率</div>
+        <div class="text-[17px] font-mono tabular-nums" style="color:${e.toolRate>=0.9?'#4ade9b':e.toolRate>=0.7?'#fbbf24':'#ff6b6b'}">${(e.toolRate*100).toFixed(1)}%</div>
+        <div class="mt-1.5">${bar(e.toolRate, e.toolRate>=0.9?'#22c55e':e.toolRate>=0.7?'#f59e0b':'#ef4444')}</div>
+      </div>
+      <div class="bg-ink-850 rounded-md p-2.5">
+        <div class="text-[10px] text-slate-500 mb-1">输出相关性</div>
+        <div class="text-[17px] font-mono tabular-nums" style="color:${rel>=0.8?'#4ade9b':rel>=0.6?'#fbbf24':'#ff6b6b'}">${rel.toFixed(2)}</div>
+        <div class="mt-1.5">${bar(rel, rel>=0.8?'#22c55e':rel>=0.6?'#f59e0b':'#ef4444')}</div>
+      </div>
+      <div class="bg-ink-850 rounded-md p-2.5">
+        <div class="text-[10px] text-slate-500 mb-1">合规校验</div>
+        <div class="text-[13px] flex items-center gap-1.5" style="color:${cc}"><i class="fa-solid ${ci} text-[11px]"></i>${cl}</div>
+        <div class="text-[10px] text-slate-500 mt-1">${e.violations.length} 项违规</div>
+      </div>
+    </div>
+
+    ${selectedTrace ? `<div class="text-[11.5px] text-slate-400 leading-relaxed bg-ink-850 rounded-md p-2.5 border-l-2" style="border-color:${cc}">
+      <i class="fa-solid fa-quote-left text-[9px] text-slate-600 mr-1"></i>${esc(e.note)}
+    </div>` : '<div class="text-[11.5px] text-slate-500 py-3 text-center">选择一条链路以查看评估结果</div>'}
+
+    ${e.violations.length ? `
+    <div>
+      <div class="text-[11px] text-slate-400 mb-2 flex items-center gap-1.5"><i class="fa-solid fa-shield-halved text-[10px] text-slate-500"></i>违规项明细</div>
+      <div class="space-y-2">
+        ${e.violations.map(v => `
+        <div class="bg-ink-850 rounded-md p-2.5 flex items-start gap-2.5">
+          ${sevTag(v.sev)}
+          <div class="min-w-0">
+            <div class="text-[11.5px] text-slate-200 font-medium">${esc(v.rule)}</div>
+            <div class="text-[11px] text-slate-400 leading-relaxed mt-0.5">${esc(v.detail)}</div>
+          </div>
+        </div>`).join('')}
+      </div>
+    </div>` : `
+    <div class="text-[11.5px] text-tool-400 flex items-center gap-2 py-2">
+      <i class="fa-solid fa-circle-check"></i>未检出违规项，链路符合全部评估规则
+    </div>`}
+  </div>`;
+}
+
+function renderDbgMeta(){
+  $('#dbgMeta').innerHTML = selectedTrace
+    ? `<span class="font-mono text-brand-400">${selectedTrace.traceId}</span>`
+    : '—';
+}
+
+function renderReplay(){
+  if (!selectedTrace){
+    $('#dbgReplay').innerHTML = '<div class="py-10 text-center text-[12px] text-slate-500"><i class="fa-solid fa-clock-rotate-left text-2xl block mb-2 opacity-40"></i>选择一条链路后可执行状态回放</div>';
+    return;
+  }
+  const bad = findBadSpan(selectedTrace.spans);
+  $('#dbgReplay').innerHTML = `
+  <div class="flex items-center gap-3 flex-wrap mb-3">
+    <button id="btnPlay" class="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-brand-600 hover:bg-brand-500 text-white text-[12px] transition">
+      <i class="fa-solid fa-play text-[10px]"></i>开始回放
+    </button>
+    <button id="btnReset" class="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-ink-850 border border-edge hover:border-slate-500 text-[12px] transition">
+      <i class="fa-solid fa-rotate-left text-[10px]"></i>重置
+    </button>
+    <span class="text-[11px] text-slate-500">按因果顺序逐 Span 重放执行过程，故障 Span 会暂停并标红</span>
+    <div class="flex-1"></div>
+    <span class="text-[11px] font-mono text-slate-400" id="replayClock">00:00.000</span>
+  </div>
+  <div class="grid gap-3" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)">
+    <div id="replaySteps" class="space-y-1.5"></div>
+    <div id="replayOut" class="bg-ink-850 rounded-md p-3 font-mono text-[11px] leading-relaxed text-slate-400 overflow-auto" style="height:240px">
+      <span class="text-slate-600">// 回放输出将在此显示</span>
+    </div>
+  </div>`;
+
+  const flat = [];
+  (function walk(nodes, d){ nodes.forEach(n => { flat.push({ ...n, depth:d }); walk(n.children, d+1); }); })(selectedTrace.spans, 0);
+  flat.sort((a,b) => (a.start||0) - (b.start||0));
+
+  $('#replaySteps').innerHTML = flat.map((s,i) => {
+    const c = colorOf(s);
+    return `<div class="replay-step flex items-center gap-2 px-2 py-1.5 rounded border border-edge opacity-35 transition" data-i="${i}">
+      <span class="w-4 text-[10px] font-mono text-slate-600 shrink-0">${String(i+1).padStart(2,'0')}</span>
+      <span class="w-4 h-4 rounded grid place-items-center shrink-0" style="background:${c.bg};border:1px solid ${c.bd}44">
+        <i class="fa-solid ${c.icon} text-[8px]" style="color:${c.tx}"></i></span>
+      <span class="text-[11.5px] text-slate-300 truncate flex-1">${esc(s.name)}</span>
+      <span class="text-[10px] font-mono text-slate-500 shrink-0">+${s.start||0}ms</span>
+      <span class="text-[10px] font-mono tabular-nums shrink-0 ${s.dur>2000?'text-warn-400':'text-slate-400'}">${fmtMs(s.dur)}</span>
+      <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background:${s.status==='failed'?'#ef4444':'#22c55e'}"></span>
+    </div>`;
+  }).join('');
+
+  function reset(){
+    clearInterval(replayTimer); replayTimer = null;
+    document.querySelectorAll('.replay-step').forEach(el => { el.classList.add('opacity-35'); el.classList.remove('bg-ink-800'); });
+    $('#replayOut').innerHTML = '<span class="text-slate-600">// 回放输出将在此显示</span>';
+    $('#replayClock').textContent = '00:00.000';
+    $('#btnPlay').innerHTML = '<i class="fa-solid fa-play text-[10px]"></i>开始回放';
+  }
+  $('#btnReset').addEventListener('click', reset);
+
+  $('#btnPlay').addEventListener('click', () => {
+    if (replayTimer){ clearInterval(replayTimer); replayTimer = null; $('#btnPlay').innerHTML = '<i class="fa-solid fa-play text-[10px]"></i>继续回放'; return; }
+    let i = 0;
+    $('#btnPlay').innerHTML = '<i class="fa-solid fa-pause text-[10px]"></i>暂停';
+    replayTimer = setInterval(() => {
+      if (i >= flat.length){ clearInterval(replayTimer); replayTimer = null; $('#btnPlay').innerHTML = '<i class="fa-solid fa-check text-[10px]"></i>回放完成'; return; }
+      const s = flat[i], c = colorOf(s);
+      const el = document.querySelector(`.replay-step[data-i="${i}"]`);
+      if (el){ el.classList.remove('opacity-35'); el.classList.add('bg-ink-800');
+        if (s.status === 'failed') el.style.borderColor = '#ef4444'; }
+      $('#replayClock').textContent = 'T+' + String(s.start || 0).padStart(5, '0') + 'ms';
+      const t = [+(s.start||0), +(s.start||0) + s.dur];
+      const line = `<span style="color:${c.tx}">[${String(t[0]).padStart(5,' ')}ms → ${String(t[1]).padStart(5,' ')}ms]</span> <span style="color:${c.bd}">${s.type.toUpperCase()}</span> ${esc(s.name)} <span style="color:#22c55e">${s.status==='success'?'✓':'✗'}</span>\n`;
+      $('#replayOut').insertAdjacentHTML('beforeend', line.replace(/\n/g,'<br>'));
+      if (s.status === 'failed'){
+        $('#replayOut').insertAdjacentHTML('beforeend',
+          `<span style="color:#ff8b8b">${esc((s.error||'').split('\n')[0])}</span><br><span style="color:#fbbf24">⏸ 回放在此处暂停：检测到故障 Span，请切换到「异常分析」查看根因</span><br>`);
+        $('#replayOut').scrollTop = $('#replayOut').scrollHeight;
+        if (el) el.scrollIntoView({ block:'nearest', behavior:'smooth' });
+        clearInterval(replayTimer); replayTimer = null;
+        $('#btnPlay').innerHTML = '<i class="fa-solid fa-play text-[10px]"></i>继续回放';
+        pushLog('ERROR', 'debug.replay', `${selectedTrace.traceId} 回放中断于故障 Span: ${s.name}`);
+        return;
+      }
+      $('#replayOut').scrollTop = $('#replayOut').scrollHeight;
+      if (el) el.scrollIntoView({ block:'nearest', behavior:'smooth' });
+      i++;
+    }, 620);
+  });
+}
+
+function renderDiagnose(){
+  const d = diagnoseFor(selectedTrace);
+  if (!selectedTrace || !d){
+    $('#dbgDiagnose').innerHTML = '<div class="py-10 text-center text-[12px] text-slate-500"><i class="fa-solid fa-wand-magic-sparkles text-2xl block mb-2 opacity-40"></i>该链路未检出异常 Span，无需根因分析</div>';
+    return;
+  }
+  const pri = (p) => p === 'P0' ? ['#ef4444','rgba(239,68,68,.16)'] : p === 'P1' ? ['#fbbf24','rgba(251,191,36,.16)'] : ['#8b95a8','rgba(139,149,168,.16)'];
+  $('#dbgDiagnose').innerHTML = `
+  <div class="space-y-4 fade-in">
+    <div class="flex items-start gap-3">
+      <span class="w-7 h-7 rounded-md bg-llm-500/20 border border-llm-500/40 grid place-items-center shrink-0">
+        <i class="fa-solid fa-wand-magic-sparkles text-llm-400 text-[11px]"></i></span>
+      <div class="min-w-0 flex-1">
+        <div class="text-[12px] text-llm-400 font-medium mb-1">AI 根因分析</div>
+        <div class="text-[12.5px] text-slate-300 leading-relaxed">${esc(d.root)}</div>
+      </div>
+    </div>
+
+    <div>
+      <div class="text-[11px] text-slate-400 mb-2 flex items-center gap-1.5"><i class="fa-solid fa-magnifying-glass-chart text-[10px] text-slate-500"></i>判定依据</div>
+      <div class="space-y-1.5">
+        ${d.evidence.map((e,i) => `
+        <div class="flex items-start gap-2 text-[11.5px] text-slate-400 leading-relaxed">
+          <span class="text-[9px] font-mono text-slate-600 mt-0.5 shrink-0">${String(i+1).padStart(2,'0')}</span>
+          <span>${esc(e)}</span>
+        </div>`).join('')}
+      </div>
+    </div>
+
+    <div>
+      <div class="text-[11px] text-slate-400 mb-2 flex items-center gap-1.5"><i class="fa-solid fa-screwdriver-wrench text-[10px] text-slate-500"></i>修复建议</div>
+      <div class="space-y-2">
+        ${d.fixes.map(f => { const [pc,pb] = pri(f.p); return `
+        <div class="bg-ink-850 rounded-md p-2.5 flex items-start gap-2.5">
+          <span class="text-[9px] font-mono px-1 py-0.5 rounded shrink-0" style="color:${pc};background:${pb}">${f.p}</span>
+          <div class="min-w-0">
+            <div class="text-[11.5px] text-slate-200 font-medium">${esc(f.t)}</div>
+            <div class="text-[11px] text-slate-400 leading-relaxed mt-0.5">${esc(f.d)}</div>
+          </div>
+        </div>`; }).join('')}
+      </div>
+    </div>
+
+    <div>
+      <div class="text-[11px] text-slate-400 mb-1.5 flex items-center gap-1.5"><i class="fa-solid fa-code text-[10px] text-slate-500"></i>参考改法</div>
+      <pre class="code text-slate-300">${esc(d.code)}</pre>
+    </div>
+  </div>`;
+}
+
+function selectTrace(t, openDrawer){
+  if (!t) return;
+  selectedTrace = t;
+  selectedSpanId = null;
+  renderTraceTable(); renderTopo(); renderEval(); renderDbgMeta(); renderReplay(); renderDiagnose();
+  pushLog(t.status === 'failed' ? 'ERROR' : 'INFO', 'trace.select',
+    `已加载链路 ${t.traceId} · ${countSpans(t.spans)} Span · ${fmtMs(t.dur)} · ${t.status}`);
+  if (openDrawer) openDrawerPanel(t);
+}
+
+function openDrawerPanel(t){
+  $('#drawerTraceId').textContent = t.traceId;
+  const bad = findBadSpan(t.spans);
+  const flat = [];
+  (function walk(nodes, d){ nodes.forEach(n => { flat.push({ ...n, depth:d }); walk(n.children, d+1); }); })(t.spans, 0);
+  const totalTok = flat.reduce((a,s)=> a + (s.tokens ? s.tokens.in + s.tokens.out : 0), 0);
+  const failCount = flat.filter(s => s.status === 'failed').length;
+  const e = evalFor(t);
+
+  $('#drawerBody').innerHTML = `
+  <div class="grid grid-cols-4 gap-2.5">
+    ${[['总耗时', fmtMs(t.dur), '#e2e8f0'], ['Span 数', flat.length, '#e2e8f0'],
+       ['失败 Span', failCount, failCount ? '#ff6b6b' : '#4ade9b'],
+       ['Token 合计', totalTok.toLocaleString(), '#b18cff']]
+      .map(([k,v,c]) => `<div class="bg-ink-850 rounded-md p-2.5">
+        <div class="text-[10px] text-slate-500 mb-0.5">${k}</div>
+        <div class="text-[15px] font-mono tabular-nums" style="color:${c}">${v}</div></div>`).join('')}
+  </div>
+
+  <div class="bg-ink-850 rounded-md p-3 space-y-1.5">
+    ${[['SessionId', t.sessionId], ['TraceId', t.traceId], ['Trace 类型', t.type],
+       ['状态', t.status], ['质量得分', t.quality.toFixed(2)], ['开始时间', t.ts.full]]
+      .map(([k,v]) => `<div class="flex items-center justify-between text-[11.5px]">
+        <span class="text-slate-500">${k}</span>
+        <span class="font-mono ${k==='状态' ? (t.status==='failed'?'text-bad-400':'text-tool-400') : 'text-slate-200'}">${v}</span></div>`).join('')}
+  </div>
+
+  ${bad ? `
+  <div class="rounded-md p-3 border" style="background:rgba(239,68,68,.06);border-color:rgba(239,68,68,.35)">
+    <div class="text-[11.5px] text-bad-400 font-medium mb-1.5 flex items-center gap-1.5">
+      <i class="fa-solid fa-triangle-exclamation text-[10px]"></i>首个故障 Span</div>
+    <div class="text-[11.5px] font-mono text-slate-200 mb-1">${esc(bad.name)} <span class="text-slate-500">(${bad.sid})</span></div>
+    <div class="text-[11px] text-slate-400 mb-2">耗时 ${fmtMs(bad.dur)} · ${bad.p99 ? 'P99 分位' : '常规耗时'}</div>
+    <pre class="code" style="color:#ff8b8b;border-color:rgba(239,68,68,.3);background:rgba(0,0,0,.3);max-height:130px">${esc((bad.error||'').split('\n').slice(0,4).join('\n'))}</pre>
+    <button class="mt-2 text-[11px] text-bad-400 hover:text-bad-500 flex items-center gap-1" id="jumpBad">
+      <i class="fa-solid fa-crosshairs text-[10px]"></i>在拓扑树中定位该 Span</button>
+  </div>` : `
+  <div class="rounded-md p-3 border border-tool-500/30" style="background:rgba(34,197,94,.06)">
+    <div class="text-[11.5px] text-tool-400 flex items-center gap-1.5"><i class="fa-solid fa-circle-check"></i>链路全部 Span 执行成功</div>
+  </div>`}
+
+  <div>
+    <div class="text-[11px] text-slate-400 mb-2 flex items-center gap-1.5">
+      <i class="fa-solid fa-sitemap text-[10px] text-slate-500"></i>Span 执行时序</div>
+    <div class="space-y-1">
+      ${flat.map(s => { const c = colorOf(s); return `
+      <div class="flex items-center gap-2 px-2 py-1 rounded text-[11px]" style="margin-left:${s.depth*12}px">
+        <span class="w-4 h-4 rounded grid place-items-center shrink-0" style="background:${c.bg};border:1px solid ${c.bd}44">
+          <i class="fa-solid ${c.icon} text-[8px]" style="color:${c.tx}"></i></span>
+        <span class="truncate flex-1 ${s.status==='failed'?'text-bad-400':'text-slate-300'}">${esc(s.name)}</span>
+        <span class="font-mono tabular-nums text-slate-500 shrink-0">${fmtMs(s.dur)}</span>
+      </div>`; }).join('')}
+    </div>
+  </div>
+
+  <div class="bg-ink-850 rounded-md p-3">
+    <div class="text-[11px] text-slate-400 mb-2">评估摘要</div>
+    <div class="grid grid-cols-3 gap-2 text-center">
+      <div><div class="text-[10px] text-slate-500 mb-0.5">工具成功率</div>
+        <div class="text-[13px] font-mono text-tool-400">${(e.toolRate*100).toFixed(0)}%</div></div>
+      <div><div class="text-[10px] text-slate-500 mb-0.5">输出相关性</div>
+        <div class="text-[13px] font-mono text-brand-400">${(e.relevance||0).toFixed(2)}</div></div>
+      <div><div class="text-[10px] text-slate-500 mb-0.5">违规项</div>
+        <div class="text-[13px] font-mono ${e.violations.length?'text-bad-400':'text-tool-400'}">${e.violations.length}</div></div>
+    </div>
+  </div>`;
+
+  const jb = $('#jumpBad');
+  if (jb) jb.addEventListener('click', () => {
+    selectedSpanId = bad.id; renderTopo();
+    closeDrawer();
+    $('#topoTree').scrollIntoView({ behavior:'smooth', block:'center' });
+  });
+
+  openDrawer();
+}
+
+function openDrawer(){
+  $('#drawer').classList.remove('translate-x-full');
+  $('#drawerMask').classList.remove('hidden');
+}
+function closeDrawer(){
+  $('#drawer').classList.add('translate-x-full');
+  $('#drawerMask').classList.add('hidden');
+}
+
+const LOG_TPL = [
+  ['INFO','trace.export',  '链路数据已写入 OTLP 导出队列 (batch=64)'],
+  ['INFO','collector',     'Span 采样率 100% · 队列深度 12 / 8192'],
+  ['INFO','eval.worker',   '质量评估完成 relevance=0.94 tool_rate=1.00'],
+  ['WARN','tool.invoke',   'query_refund_eligibility 响应 1840ms，接近超时阈值 3000ms'],
+  ['WARN','llm.ratelimit', 'LLM 上游返回 429，已按指数退避重试 (attempt 1/3)'],
+  ['ERROR','tool.timeout', 'HttpTimeoutException: query_refund_eligibility 超时 3000ms (attempt 3/3)'],
+  ['ERROR','agent.abort',  'OrchestratorAgent 第 5 轮推理中止，工具不可用且无降级路径'],
+  ['INFO','subagent',      'EscalationAgent 已接管，生成工单 TK-99301'],
+  ['WARN','budget.token',  '会话 token 用量达配额 82%，接近上限'],
+  ['INFO','memory.load',   '长期记忆命中 3 条画像，注入系统提示词'],
+  ['ERROR','parse.fail',   'ModelResponseParseException: 输出未命中 strict JSON Schema'],
+  ['INFO','span.flush',    '批量提交 24 个 Span，成功 24 / 失败 0']
+];
+function pushLog(level, scope, msg){
+  const c = level === 'ERROR' ? '#ff8b8b' : level === 'WARN' ? '#fbbf24' : '#7ee2a8';
+  const ic = level === 'ERROR' ? 'fa-circle-xmark' : level === 'WARN' ? 'fa-triangle-exclamation' : 'fa-circle-info';
+  logLines.push({ level, html: `<div class="flex gap-2">
+    <span class="text-slate-600 shrink-0">${nowStr()}</span>
+    <span class="shrink-0 w-[52px]" style="color:${c}"><i class="fa-solid ${ic} text-[9px] mr-1"></i>${level}</span>
+    <span class="text-slate-500 shrink-0 w-[112px] truncate">${esc(scope)}</span>
+    <span class="text-slate-300">${esc(msg)}</span></div>` });
+  if (logLines.length > 400) logLines.shift();
+  renderLog();
+}
+function renderLog(){
+  const filtered = logFilter === 'all' ? logLines : logLines.filter(l => l.level === logFilter);
+  $('#logPanel').innerHTML = filtered.map(l => l.html).join('') ||
+    '<div class="text-slate-600 text-center py-8">暂无日志</div>';
+  if ($('#logAuto').checked) $('#logPanel').scrollTop = $('#logPanel').scrollHeight;
+}
+
+function renderAll(){
+  renderTraceTable();
+  renderTopo();
+  renderEval();
+  renderDbgMeta();
+  renderReplay();
+  renderDiagnose();
+}
+
+$('#selProject').addEventListener('change', (e) => {
+  pushLog('INFO', 'project.switch', `已切换项目 ${e.target.value}，重新建立链路订阅`);
+  TRACES = buildTraces();
+  selectedTrace = null; selectedSpanId = null;
+  renderAll(); closeDrawer();
+});
+
+document.querySelectorAll('.env-btn').forEach(b => b.addEventListener('click', () => setEnv(b.dataset.env)));
+['#filterStatus','#filterType','#filterRange'].forEach(s => $(s).addEventListener('change', renderTraceTable));
+
+$('#btnRefresh').addEventListener('click', () => {
+  const ic = $('#refreshIcon');
+  ic.classList.add('fa-spin');
+  TRACES = buildTraces();
+  selectedTrace = null; selectedSpanId = null;
+  renderAll(); closeDrawer();
+  setTimeout(() => ic.classList.remove('fa-spin'), 620);
+  pushLog('INFO', 'collector.refresh', '手动刷新：已重新拉取最近 24h 链路与指标');
+});
+
+document.querySelectorAll('.log-btn').forEach(b => b.addEventListener('click', () => {
+  logFilter = b.dataset.log;
+  document.querySelectorAll('.log-btn').forEach(x => {
+    const on = x.dataset.log === logFilter;
+    x.className = 'log-btn px-2 py-0.5 rounded text-[10px] border ' +
+      (on ? (x.dataset.log === 'ERROR' ? 'border-bad-500 text-bad-400' : x.dataset.log === 'WARN' ? 'border-warn-500 text-warn-400' : 'border-brand-500 text-brand-400')
+          : 'border-edge text-slate-400');
+  });
+  renderLog();
+}));
+$('#btnClearLog').addEventListener('click', () => { logLines = []; renderLog(); });
+
+document.querySelectorAll('.dbg-tab').forEach(b => b.addEventListener('click', () => {
+  const tab = b.dataset.dtab;
+  document.querySelectorAll('.dbg-tab').forEach(x => {
+    x.classList.toggle('on', x.dataset.dtab === tab);
+    x.classList.toggle('text-slate-400', x.dataset.dtab !== tab);
+  });
+  $('#dbgReplay').classList.toggle('hidden', tab !== 'replay');
+  $('#dbgDiagnose').classList.toggle('hidden', tab !== 'diagnose');
+}));
+
+$('#btnExpandAll').addEventListener('click', () => {
+  if (!selectedTrace) return;
+  let anyCollapsed = false;
+  (function walk(n){ n.forEach(s => { if (s.children.length && s.collapsed) anyCollapsed = true; walk(s.children); }); })(selectedTrace.spans);
+  (function walk(n){ n.forEach(s => { s.collapsed = anyCollapsed ? false : (s.children.length > 0); walk(s.children); }); })(selectedTrace.spans);
+  $('#btnExpandAll').innerHTML = anyCollapsed
+    ? '<i class="fa-solid fa-angles-up text-[10px] mr-1"></i>全折叠'
+    : '<i class="fa-solid fa-angles-down text-[10px] mr-1"></i>全展开';
+  renderTopo();
+});
+
+$('#drawerClose').addEventListener('click', closeDrawer);
+$('#drawerMask').addEventListener('click', closeDrawer);
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDrawer(); });
+
+setEnv('prod');
+renderAll();
+pushLog('INFO', 'collector', 'PandaProbe 采集器已启动 · OTLP/gRPC :4317 · 采样率 100%');
+pushLog('INFO', 'collector', '已加载 24h 链路数据，共 ' + TRACES.length + ' 条 Trace');
+setTimeout(() => pushLog('INFO', 'eval.worker', '评估任务已入队，指标：tool_success_rate / output_relevance / compliance'), 900);
+setTimeout(() => pushLog('WARN', 'tool.invoke', 'query_refund_eligibility 响应 1840ms，接近超时阈值 3000ms'), 1800);
+setTimeout(() => pushLog('ERROR', 'tool.timeout', 'HttpTimeoutException: query_refund_eligibility 超时 3000ms (attempt 3/3)'), 2600);
+
+let logSeq = 0;
+setInterval(() => {
+  const t = LOG_TPL[logSeq++ % LOG_TPL.length];
+  pushLog(t[0], t[1], t[2]);
+}, 5200);
+
+selectTrace(TRACES.find(t => t.status === 'failed'), false);
+</script>
+</body>
+</html>

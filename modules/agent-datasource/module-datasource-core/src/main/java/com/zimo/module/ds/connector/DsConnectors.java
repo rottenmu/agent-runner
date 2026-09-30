@@ -1,6 +1,7 @@
 package com.zimo.module.ds.connector;
 
 import java.io.File;
+import java.net.Socket;
 import cn.hutool.core.util.StrUtil;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -600,24 +601,7 @@ final class DsConnectors {
         public String test(Map<String, Object> config) {
             String protocol = str(config.get("protocol"));
             if ("ftp".equalsIgnoreCase(protocol)) {
-                String host = str(config.get("host"));
-                if (!StringUtils.hasText(host)) {
-                    return "FAIL: FTP 缺少 host";
-                }
-                FTPClient client = new FTPClient();
-                try {
-                    int port = config.get("port") instanceof Number n ? n.intValue() : 21;
-                    client.connect(host, port);
-                    client.login(str(config.get("username")), str(config.get("password")));
-                    return "OK: FTP 连接成功 " + host;
-                } catch (Exception e) {
-                    return "FAIL: " + safeMessage(e);
-                } finally {
-                    try {
-                        client.disconnect();
-                    } catch (Exception ignored) {
-                    }
-                }
+                return ftpTest(config);
             }
             String root = str(config.get("rootPath"));
             if (!StringUtils.hasText(root)) {
@@ -637,8 +621,7 @@ final class DsConnectors {
             }
             if ("ftp".equalsIgnoreCase(str(config.get("protocol")))) {
                 return ftpPreview(config, target);
-            }
-            File dir = new File(target);
+            }            File dir = new File(target);
             if (!dir.isDirectory()) {
                 return DsDataPreview.of(List.of("错误"), List.of(Map.of("错误", "目录不存在: " + target)), "读取失败");
             }
@@ -658,33 +641,339 @@ final class DsConnectors {
             }
             return new DsDataPreview(List.of("name", "size", "type"), rows, rows.size(), "目录 " + target);
         }
+    }
 
-        private DsDataPreview ftpPreview(Map<String, Object> config, String target) {
-            FTPClient client = new FTPClient();
-            List<Map<String, Object>> rows = new ArrayList<>();
-            try {
-                int port = config.get("port") instanceof Number n ? n.intValue() : 21;
-                client.connect(str(config.get("host")), port);
-                client.login(str(config.get("username")), str(config.get("password")));
-                for (org.apache.commons.net.ftp.FTPFile file : client.listFiles(target)) {
-                    Map<String, Object> row = new LinkedHashMap<>();
-                    row.put("name", file.getName());
-                    row.put("size", file.getSize());
-                    row.put("type", file.isDirectory() ? "dir" : "file");
-                    rows.add(row);
-                    if (rows.size() >= MAX_ROWS) {
-                        break;
-                    }
-                }
-                return new DsDataPreview(List.of("name", "size", "type"), rows, rows.size(), "FTP 目录 " + target);
+    /* ================= 细粒度数据库：MySQL / MariaDB / PostgreSQL ================= */
+
+    /**
+     * JDBC 预设连接器：在泛化 DatabaseConnector 之上按数据库品种
+     * 预置 URL 前缀与驱动类，允许只填 host/port/database 而不手写 jdbcUrl。
+     */
+    abstract static class JdbcPresetConnector extends DatabaseConnector {
+
+        private final String label;
+        private final String urlPrefix;
+        private final String driverClass;
+        private final int defaultPort;
+
+        JdbcPresetConnector(String label, String urlPrefix, String driverClass, int defaultPort) {
+            this.label = label;
+            this.urlPrefix = urlPrefix;
+            this.driverClass = driverClass;
+            this.defaultPort = defaultPort;
+        }
+
+        @Override
+        protected Connection connect(Map<String, Object> config) throws Exception {
+            Map<String, Object> merged = withJdbcUrl(config);
+            if (merged == null) {
+                throw new IllegalArgumentException("缺少 jdbcUrl 或 host");
+            }
+            return super.connect(merged);
+        }
+
+        @Override
+        public String test(Map<String, Object> config) {
+            Map<String, Object> merged = withJdbcUrl(config);
+            if (merged == null) {
+                return "FAIL: 缺少 jdbcUrl 或 host";
+            }
+            return withLabel(super.test(merged));
+        }
+
+        /** 未手填 jdbcUrl 时按 host/port/database 预构建；两者都没有返回 null。 */
+        private Map<String, Object> withJdbcUrl(Map<String, Object> config) {
+            if (StringUtils.hasText(str(config.get("jdbcUrl")))) {
+                return config;
+            }
+            String host = str(config.get("host"));
+            if (!StringUtils.hasText(host)) {
+                return null;
+            }
+            String database = str(config.get("database"));
+            int port = intVal(config, "port", defaultPort);
+            Map<String, Object> merged = new LinkedHashMap<>(config);
+            merged.put("jdbcUrl", buildJdbcUrl(host, port, database));
+            if (!StringUtils.hasText(str(config.get("driver")))) {
+                merged.put("driver", driverClass);
+            }
+            return merged;
+        }
+
+        String buildJdbcUrl(String host, int port, String database) {
+            return urlPrefix + host + ":" + port + "/" + database;
+        }
+
+        /** 把泛化消息包装成带品种标签的测试结果（OK: 数据库连接成功 → OK: MySQL 连接成功 …）。 */
+        String withLabel(String baseResult) {
+            if (baseResult != null && baseResult.startsWith("OK")) {
+                return "OK: " + label + " " + baseResult.substring("OK: 数据库".length());
+            }
+            return baseResult;
+        }
+    }
+
+    static class MysqlConnector extends JdbcPresetConnector {
+
+        MysqlConnector() {
+            super("MySQL", "jdbc:mysql://", "com.mysql.cj.jdbc.Driver", 3306);
+        }
+
+        @Override
+        public String type() {
+            return "mysql";
+        }
+
+        @Override
+        String buildJdbcUrl(String host, int port, String database) {
+            return super.buildJdbcUrl(host, port, database)
+                    + "?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai";
+        }
+    }
+
+    static class MariadbConnector extends JdbcPresetConnector {
+
+        MariadbConnector() {
+            super("MariaDB", "jdbc:mariadb://", "org.mariadb.jdbc.Driver", 3306);
+        }
+
+        @Override
+        public String type() {
+            return "mariadb";
+        }
+    }
+
+    static class PostgreSqlConnector extends JdbcPresetConnector {
+
+        PostgreSqlConnector() {
+            super("PostgreSQL", "jdbc:postgresql://", "org.postgresql.Driver", 5432);
+        }
+
+        @Override
+        public String type() {
+            return "postgresql";
+        }
+    }
+
+    /* ================= Redis ================= */
+
+    /** Redis 连接器：零依赖，直接说 RESP 协议（AUTH → SELECT → PING/GET/DBSIZE）。 */
+    static class RedisConnector implements DsConnector {
+
+        @Override
+        public String type() {
+            return "redis";
+        }
+
+        @Override
+        public String test(Map<String, Object> config) {
+            try (Socket socket = connect(config)) {
+                String pong = resp(send(socket, "PING"));
+                return "PONG".equals(pong)
+                        ? "OK: Redis 连接成功 " + str(config.get("host")) + ":" + intVal(config, "port", 6379)
+                        : "FAIL: PING 响应异常: " + pong;
             } catch (Exception e) {
-                return DsDataPreview.of(List.of("错误"), List.of(Map.of("错误", safeMessage(e))), "FTP 读取失败");
-            } finally {
-                try {
-                    client.disconnect();
-                } catch (Exception ignored) {
+                return "FAIL: " + safeMessage(e);
+            }
+        }
+
+        @Override
+        public DsDataPreview preview(Map<String, Object> config, Map<String, Object> params) {
+            String key = firstText(params == null ? null : params.get("key"), config.get("key"));
+            try (Socket socket = connect(config)) {
+                List<Map<String, Object>> rows = new ArrayList<>();
+                List<String> columns = new ArrayList<>();
+                List<String> messages = new ArrayList<>();
+                if (StringUtils.hasText(key)) {
+                    String value = resp(send(socket, "GET", key));
+                    columns.add("key");
+                    columns.add("value");
+                    Map<String, Object> row = new LinkedHashMap<>();
+                    row.put("key", key);
+                    row.put("value", value);
+                    rows.add(row);
+                    messages.add("GET " + key);
+                } else {
+                    String dbsize = resp(send(socket, "DBSIZE"));
+                    columns.add("dbsize");
+                    rows.add(Map.of("dbsize", dbsize));
+                    messages.add("DBSIZE=" + dbsize + "（用 params.key 可预览单个键）");
+                }
+                return new DsDataPreview(columns, rows, rows.size(), String.join(" | ", messages));
+            } catch (Exception e) {
+                return DsDataPreview.of(List.of("错误"), List.of(Map.of("错误", safeMessage(e))), "Redis 查询失败");
+            }
+        }
+
+        private Socket connect(Map<String, Object> config) throws Exception {
+            String host = str(config.get("host"));
+            if (!StringUtils.hasText(host)) {
+                throw new IllegalArgumentException("缺少 host");
+            }
+            Socket socket = new Socket();
+            socket.connect(new java.net.InetSocketAddress(host, intVal(config, "port", 6379)), 5000);
+            socket.setSoTimeout(5000);
+            String password = str(config.get("password"));
+            if (StringUtils.hasText(password)) {
+                String auth = resp(send(socket, "AUTH", password));
+                if (auth == null || !auth.startsWith("OK")) {
+                    throw new IllegalStateException("AUTH 失败: " + auth);
                 }
             }
+            String db = str(config.get("db"));
+            if (StringUtils.hasText(db) && !"0".equals(db)) {
+                String select = resp(send(socket, "SELECT", db));
+                if (select == null || !select.startsWith("OK")) {
+                    throw new IllegalStateException("SELECT db 失败: " + select);
+                }
+            }
+            return socket;
+        }
+
+        /** 发送 RESP 数组命令并返回原始输入流（供 resp() 解析）。 */
+        private java.io.InputStream send(Socket socket, String... args) throws Exception {
+            StringBuilder cmd = new StringBuilder("*").append(args.length).append("\r\n");
+            for (String arg : args) {
+                cmd.append("$").append(arg.getBytes(StandardCharsets.UTF_8).length).append("\r\n")
+                        .append(arg).append("\r\n");
+            }
+            java.io.OutputStream out = socket.getOutputStream();
+            out.write(cmd.toString().getBytes(StandardCharsets.UTF_8));
+            out.flush();
+            return socket.getInputStream();
+        }
+
+        /** 解析单条 RESP 回复：+/○/-/:/$ 五类前缀，只取首个回复。 */
+        private String resp(java.io.InputStream in) throws Exception {
+            int prefix = in.read();
+            if (prefix == -1) {
+                return null;
+            }
+            String line = readLine(in);
+            char type = (char) prefix;
+            return switch (type) {
+                case '+', '-', ':' -> line;
+                case '$' -> {
+                    int len = Integer.parseInt(line.trim());
+                    if (len < 0) {
+                        yield null; // RESP 空批量（键不存在）
+                    }
+                    byte[] buf = in.readNBytes(len);
+                    readLine(in); // 消费结尾 CRLF
+                    yield new String(buf, StandardCharsets.UTF_8);
+                }
+                default -> line;
+            };
+        }
+
+        private String readLine(java.io.InputStream in) throws Exception {
+            StringBuilder sb = new StringBuilder();
+            int prev = -1;
+            int b;
+            while ((b = in.read()) != -1) {
+                if (prev == '\r' && b == '\n') {
+                    break;
+                }
+                if (prev != -1) {
+                    sb.append((char) prev);
+                }
+                prev = b;
+            }
+            return sb.toString();
+        }
+    }
+
+    /* ================= MinIO / 阿里云 OSS（对象存储） ================= */
+
+    /** MinIO 连接器：健康检查走未鉴权 /minio/health/live（对象列举需签名，预览给引导说明）。 */
+    static class MinioConnector implements DsConnector {
+
+        @Override
+        public String type() {
+            return "minio";
+        }
+
+        @Override
+        public String test(Map<String, Object> config) {
+            String endpoint = str(config.get("endpoint"));
+            if (!StringUtils.hasText(endpoint)) {
+                return "FAIL: 缺少 endpoint（如 http://127.0.0.1:9000）";
+            }
+            try {
+                int code = httpProbe(endpoint.endsWith("/") ? endpoint + "minio/health/live" : endpoint + "/minio/health/live");
+                return code >= 200 && code < 300
+                        ? "OK: MinIO 存活 " + endpoint
+                        : "FAIL: MinIO 健康检查返回 HTTP " + code;
+            } catch (Exception e) {
+                return "FAIL: " + safeMessage(e);
+            }
+        }
+
+        @Override
+        public DsDataPreview preview(Map<String, Object> config, Map<String, Object> params) {
+            return DsDataPreview.of(List.of("说明"), List.of(Map.of("说明",
+                    "MinIO 对象列举需要 AWS SigV4 签名，请通过「测试连接」验证存活性，"
+                            + "或用 api 类型配合预签名 URL 浏览对象")), "对象预览需签名");
+        }
+    }
+
+    /** 阿里云 OSS 连接器：以 bucket 端点 HTTP 可达性做存活性判断。 */
+    static class OssConnector implements DsConnector {
+
+        @Override
+        public String type() {
+            return "oss";
+        }
+
+        @Override
+        public String test(Map<String, Object> config) {
+            String endpoint = str(config.get("endpoint"));
+            String bucket = str(config.get("bucket"));
+            if (!StringUtils.hasText(endpoint) || !StringUtils.hasText(bucket)) {
+                return "FAIL: 缺少 endpoint 或 bucket";
+            }
+            String url = "https://" + bucket + "." + endpoint + "/";
+            try {
+                int code = httpProbe(url);
+                // 未签名请求正常会拿到 403/404 —— 只要端点应答即视为可达
+                return code < 500
+                        ? "OK: OSS 端点可达 " + url + "（HTTP " + code + "）"
+                        : "FAIL: OSS 端点异常 HTTP " + code;
+            } catch (Exception e) {
+                return "FAIL: " + safeMessage(e);
+            }
+        }
+
+        @Override
+        public DsDataPreview preview(Map<String, Object> config, Map<String, Object> params) {
+            return DsDataPreview.of(List.of("说明"), List.of(Map.of("说明",
+                    "OSS 对象列举需要签名，请通过「测试连接」验证 bucket 可达性，"
+                            + "或用 api 类型配合预签名 URL 浏览对象")), "对象预览需签名");
+        }
+    }
+
+    /* ================= FTP（独立类型，复用文件服务器的 FTP 逻辑） ================= */
+
+    static class FtpConnector implements DsConnector {
+
+        @Override
+        public String type() {
+            return "ftp";
+        }
+
+        @Override
+        public String test(Map<String, Object> config) {
+            return ftpTest(config);
+        }
+
+        @Override
+        public DsDataPreview preview(Map<String, Object> config, Map<String, Object> params) {
+            String target = firstText(params == null ? null : params.get("path"),
+                    firstText(params == null ? null : params.get("directory"), config.get("rootPath")));
+            if (!StringUtils.hasText(target)) {
+                return DsDataPreview.of(List.of("说明"), List.of(Map.of("说明", "请提供 rootPath 或 params.path")), "缺少路径");
+            }
+            return ftpPreview(config, target);
         }
     }
 
@@ -692,6 +981,81 @@ final class DsConnectors {
 
     static String str(Object value) {
         return value == null ? "" : String.valueOf(value).trim();
+    }
+
+    /** 取整型配置，缺省/非法回落默认值。 */
+    static int intVal(Map<String, Object> config, String key, int defaultValue) {
+        Object v = config.get(key);
+        if (v instanceof Number n) {
+            return n.intValue();
+        }
+        try {
+            return StringUtils.hasText(str(v)) ? Integer.parseInt(str(v)) : defaultValue;
+        } catch (NumberFormatException e) {
+            return defaultValue;
+        }
+    }
+
+    /** HTTP GET 存活探测：返回状态码（4xx 也算端点应答）；连接/网络异常向上抛。 */
+    static int httpProbe(String url) throws Exception {
+        java.net.HttpURLConnection conn = (java.net.HttpURLConnection) java.net.URI.create(url).toURL().openConnection();
+        conn.setConnectTimeout(5000);
+        conn.setReadTimeout(5000);
+        conn.setRequestMethod("GET");
+        int code = conn.getResponseCode();
+        conn.disconnect();
+        return code;
+    }
+
+    /** FTP 连通性测试（file_server protocol=ftp 与独立 ftp 类型共用）。 */
+    static String ftpTest(Map<String, Object> config) {
+        String host = str(config.get("host"));
+        if (!StringUtils.hasText(host)) {
+            return "FAIL: FTP 缺少 host";
+        }
+        FTPClient client = new FTPClient();
+        try {
+            int port = intVal(config, "port", 21);
+            client.connect(host, port);
+            client.login(str(config.get("username")), str(config.get("password")));
+            return "OK: FTP 连接成功 " + host + ":" + port;
+        } catch (Exception e) {
+            return "FAIL: " + safeMessage(e);
+        } finally {
+            try {
+                client.disconnect();
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
+    /** FTP 目录列表预览（file_server protocol=ftp 与独立 ftp 类型共用）。 */
+    static DsConnector.DsDataPreview ftpPreview(Map<String, Object> config, String target) {
+        FTPClient client = new FTPClient();
+        List<Map<String, Object>> rows = new ArrayList<>();
+        try {
+            int port = intVal(config, "port", 21);
+            client.connect(str(config.get("host")), port);
+            client.login(str(config.get("username")), str(config.get("password")));
+            for (org.apache.commons.net.ftp.FTPFile file : client.listFiles(target)) {
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("name", file.getName());
+                row.put("size", file.getSize());
+                row.put("type", file.isDirectory() ? "dir" : "file");
+                rows.add(row);
+                if (rows.size() >= MAX_ROWS) {
+                    break;
+                }
+            }
+            return new DsConnector.DsDataPreview(List.of("name", "size", "type"), rows, rows.size(), "FTP 目录 " + target);
+        } catch (Exception e) {
+            return DsConnector.DsDataPreview.of(List.of("错误"), List.of(Map.of("错误", safeMessage(e))), "FTP 读取失败");
+        } finally {
+            try {
+                client.disconnect();
+            } catch (Exception ignored) {
+            }
+        }
     }
 
     static String firstText(Object first, Object second) {

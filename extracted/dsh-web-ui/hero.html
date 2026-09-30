@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="Gu73rkRVDfAahoYPgTJeMf">
+<head data-page-node-id="ryxpkJtL5pbwxMYQ8rvjFn">
+<meta charset="UTF-8" data-page-node-id="VozpdS8jwsslYGxOot5fmB">
+<meta name="viewport" content="width=device-width, initial-scale=1" data-page-node-id="c21PWWxcQUWIws97wnHkT0">
+<title>Agent Runner — 新建会话</title>
+<!--
+  同一张页面的另一个相位：data-phase="hero"（新建 / 空会话首屏）。
+  源码里首屏与停靠态是同一个 ConversationRoot，只是相位不同：
+    · 头部在首屏整块隐藏（源码 .headerHidden），不占列宽
+    · composer 栈由「粘底」变为「列内居中」
+    · 输入卡右侧多一行工作区 chip，草稿地板由 36px 提到 52px（两行）
+  其余外壳、侧栏、右栏与 index.html 完全相同。
+-->
+<link rel="stylesheet" href="styles/dsw-tokens.css" data-page-node-id="RHL2BBqOs5hNNtOFSGCKGH">
+<link rel="stylesheet" href="styles/dsw-page.css" data-page-node-id="VFleKJEJElQWZhHpzy8tY9">
+<style>
+  /* ---- 首屏相位：ConversationRoot.module.css 的 data-phase 规则 ---- */
+  .cv-root[data-phase='hero'] .cv-header { display: none; }
+  .cv-root[data-phase='hero'] .cv-scroll { justify-content: center; overflow-y: auto; }
+</style>
+</head>
+<body data-page-node-id="YxtPJgkwUmBnxWpkQ8q88Z">
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" data-page-node-id="LFaCkjY47Gn3JLIhSjEKHG">
+  <defs data-page-node-id="xzHcwYKFS2beOcHJlwDUyH">
+    <symbol id="i-whale" viewBox="0 0 24 24" data-page-node-id="W77qQja9wgAwEeZngjfJ2R">
+      <path d="M3 12.4c0-.6.5-1 1.1-1h3.2c.4 0 .8.2 1 .6l1 1.5c.5.7 1.3 1.1 2.2 1.1h1.4c2.9 0 5.3-2.3 5.3-5.2V8.2l2.6 1.5c.5.3.8.8.8 1.4 0 4.9-4 8.9-8.9 8.9h-2.6C5.6 20 3 17.4 3 14.2z"
+            fill="currentColor" stroke="none" data-page-node-id="RPlUzqBgXoY8hdmgs6K3TE"/>
+      <circle cx="8.4" cy="13.6" r=".95" fill="var(--dsw-alias-bg-base)" stroke="none" data-page-node-id="wzT2rPXOHURgL3VlAaBj1Y"/>
+    </symbol>
+    <symbol id="i-panel" viewBox="0 0 16 16" data-page-node-id="pw9bhMxORfCr0rTkcauuWO">
+      <rect x="1.75" y="2.75" width="12.5" height="10.5" rx="2.5" data-page-node-id="cDUi5YhJBWBbexVb4mvOC7"/><path d="M6.25 2.75v10.5" data-page-node-id="Jo6sSB8oGHQWUJ2kLIxTq7"/>
+    </symbol>
+    <symbol id="i-plus" viewBox="0 0 16 16" data-page-node-id="wWncuway488THdQHDS1nRD"><path d="M8 3.5v9M3.5 8h9" data-page-node-id="O7UtDg3HDVG8fNwENrAJ9G"/></symbol>
+    <symbol id="i-chat" viewBox="0 0 16 16" data-page-node-id="sSk8WmOLBpjWDaOjONaKzG">
+      <path d="M13.5 7.6c0 2.7-2.5 4.9-5.5 4.9-.7 0-1.3-.1-1.9-.3l-2.8 1.1.9-2.5c-.8-.8-1.2-1.9-1.2-3.2 0-2.7 2.5-4.9 5.5-4.9s5 2.2 5 4.9z" data-page-node-id="EYaaf8b5JdnaL8q2147br9"/>
+    </symbol>
+    <symbol id="i-trajectory" viewBox="0 0 16 16" data-page-node-id="CbgyVzGbTsUn6VVqxok85S">
+      <path d="M2.5 12.5h2.2l2-4.5 2.3 7 2.2-8.5 1.6 3h1.7" data-page-node-id="stt5IRgXiAAHQR9IZoa0kB"/><circle cx="12.6" cy="9.5" r="1.1" data-page-node-id="2DSansXfmqnHA9Qpq8ZziU"/>
+    </symbol>
+    <symbol id="i-settings" viewBox="0 0 16 16" data-page-node-id="v4jILnPELBZ9IdvYw21AU0">
+      <circle cx="8" cy="8" r="2.1" data-page-node-id="MjoKMSPijiYcBCSBu2M2jZ"/>
+      <path d="M8 1.9v1.6M8 12.5v1.6M14.1 8h-1.6M3.5 8H1.9M12.3 3.7l-1.1 1.1M4.8 11.2l-1.1 1.1M12.3 12.3l-1.1-1.1M4.8 4.8 3.7 3.7" data-page-node-id="P5SwhUs0QLR6WY8EDPPV9i"/>
+    </symbol>
+    <symbol id="i-files" viewBox="0 0 16 16" data-page-node-id="TAKAS8HtLgqBE9rUAxqRX0">
+      <path d="M2.75 3.5c0-.6.5-1.1 1.1-1.1h2.6l1.4 1.6h4.4c.6 0 1.1.5 1.1 1.1v6.4c0 .6-.5 1.1-1.1 1.1H3.85c-.6 0-1.1-.5-1.1-1.1z" data-page-node-id="4Eos2gYoFHcxsmhxTRah8G"/>
+    </symbol>
+    <symbol id="i-doc" viewBox="0 0 16 16" data-page-node-id="tSIPgQKZF8Qn0BCp16rm37">
+      <path d="M3.5 2.9c0-.6.5-1.1 1.1-1.1h4.2l3.7 3.6v7.7c0 .6-.5 1.1-1.1 1.1H4.6c-.6 0-1.1-.5-1.1-1.1z" data-page-node-id="LUZbiTCO1uO240DYvMAinO"/>
+      <path d="M8.6 1.9v3.5h3.6M5.6 8.6h4.8M5.6 11h3.4" data-page-node-id="8CiYOaGHqvFtJsE95iRD7K"/>
+    </symbol>
+    <symbol id="i-chevron-down" viewBox="0 0 16 16" data-page-node-id="bHlvP2DVGSqcR7XnVnPSGG"><path d="M4 6.25 8 10.25l4-4" data-page-node-id="X7wvOqoESRaUSZiiHDZ2UK"/></symbol>
+    <symbol id="i-chevron-right" viewBox="0 0 16 16" data-page-node-id="GGE3hG5Cl0CAeSWHH35vOc"><path d="M6.25 4 10.25 8l-4 4" data-page-node-id="OjWxmCCj40srRAA1X939TA"/></symbol>
+    <symbol id="i-search" viewBox="0 0 16 16" data-page-node-id="t0HLB47tj3CcUNYSUas1U3">
+      <circle cx="7.2" cy="7.2" r="4.2" data-page-node-id="5FcD18iqhVlJrzduNXh1Bc"/><path d="M10.4 10.4 13.5 13.5" data-page-node-id="ubEQSuaswUS1gbUAzU5ww6"/>
+    </symbol>
+    <symbol id="i-more" viewBox="0 0 16 16" data-page-node-id="VkjpN3TO3jmLUx4d4u0YYO">
+      <circle cx="3.4" cy="8" r=".95" fill="currentColor" stroke="none" data-page-node-id="WTAF5Fc9wp3taU2cfxJvAy"/>
+      <circle cx="8" cy="8" r=".95" fill="currentColor" stroke="none" data-page-node-id="qNhAbClgbQm85xYoNncl8B"/>
+      <circle cx="12.6" cy="8" r=".95" fill="currentColor" stroke="none" data-page-node-id="zBqjsqeIpTzCaLPYNRdkTh"/>
+    </symbol>
+    <symbol id="i-send" viewBox="0 0 16 16" data-page-node-id="QGiAcOZVoNnZy1kdUlAjID"><path d="M8 12.5V3.6M4.2 7.2 8 3.4l3.8 3.8" data-page-node-id="lAk3YDM5wSqgagFqcxrRcr"/></symbol>
+    <symbol id="i-brand" viewBox="0 0 16 16" data-page-node-id="aFUmFwU5Xf2423ykS3Xda3">
+      <path d="M13.9 1.9c.35 2.9-.2 9.3-4.1 11.1-1.7.8-3.6.10-4.5-.7l-.6 1.6H2.6l.5-1.75C2.4 11.4 2 10.15 2 8.6h1.9c0 1.3.35 2.3.9 2.9C6.15 10.1 7.3 5.9 9.55 4.15c1.4-1.1 3.3-.5 4.35-2.25z" fill="currentColor" stroke="none" data-page-node-id="FPArnXZswWmHNdTJbDgjsM"/>
+    </symbol>
+    <symbol id="i-folder" viewBox="0 0 16 16" data-page-node-id="af4TRQkIWoqHPVlFbv8For">
+      <path d="M2.75 3.5c0-.6.5-1.1 1.1-1.1h2.6l1.4 1.6h4.4c.6 0 1.1.5 1.1 1.1v6.4c0 .6-.5 1.1-1.1 1.1H3.85c-.6 0-1.1-.5-1.1-1.1z" data-page-node-id="DmpWBwVDZKcRYVQCumBsvc"/>
+    </symbol>
+  </defs>
+</svg>
+
+<div class="af-frame" id="frame" data-rightbar-collapsed data-page-node-id="0Xcbeos1WMb4jMJEZzTg6I">
+
+  <!-- ---------- 左栏：与会话页相同，只是没有选中项 ---------- -->
+  <div class="af-sidebar-col" data-page-node-id="duiT25oegzTSmTAGhZw9nj">
+    <aside class="sb-root" id="sidebar" data-page-node-id="p3EqZCIK8tXoolEfa5cySc">
+      <div class="sb-logo-row" data-page-node-id="aJU2LoKoe7D7EeqUTQTYBZ">
+        <button class="sb-brand" type="button" data-page-node-id="RrTQw1b55xkjsEwo1b4B2F">
+          <span class="sb-brand-identity" data-page-node-id="OfVAYp1uaplpf56fo9Ka7m">
+            <span class="sb-brand-mark" data-page-node-id="vQLKGtW0bnRRDVjk45KTVf">
+              <svg class="ic" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" data-page-node-id="HQWUEOsznQvvxBv1F1jo5M"><use href="#i-whale" data-page-node-id="NmUACH833UuX2bEuedLA4K"/></svg>
+            </span>
+            <span class="sb-brand-name sb-wide" data-page-node-id="0uTEySz5GAr61wXYUxVOpY">Agent Runner</span>
+            <span class="sb-build-version sb-wide" data-page-node-id="1TNCFSPiuhqZfYMFDf3WHH">LOCAL</span>
+          </span>
+        </button>
+        <button class="sb-icon-button" type="button" id="toggleSidebar" title="折叠侧栏" data-page-node-id="sHRhjMQkAEaeypU4WZZR3L">
+          <svg class="ic" width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="Axm3qTKpxx9Uf5o62aYMyk"><use href="#i-panel" data-page-node-id="lkpeAXr6c3MJt4PCxw9L1D"/></svg>
+        </button>
+      </div>
+
+      <button class="sb-new-session" type="button" data-page-node-id="BcFNcoqvenDrkkgrADBWx5">
+        <svg class="ic" width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" data-page-node-id="CD8fonLh8WTB1nt2GQM1VN"><use href="#i-plus" data-page-node-id="YUSIpk1WlF6ddm8AA75sZV"/></svg>
+        <span class="sb-wide" data-page-node-id="D4JGzXkf5MOfIv1PRrCixm">新建会话</span>
+      </button>
+
+      <nav class="sb-panel-list" data-page-node-id="D1rGOTzA1JX4uc3mRwHeKX">
+        <button class="sb-panel-row" type="button" data-active data-page-node-id="z44WrOzrRIz2n72dGXLGL7">
+          <svg class="ic" width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" data-page-node-id="W9Hho7pAlTHDJvbCzwQphT"><use href="#i-chat" data-page-node-id="PdaUr6aJvBkmbJUtco1TPF"/></svg>
+          <span class="sb-panel-title sb-wide" data-page-node-id="qJl9jO3EhcfHaaDSMX2tyh">对话</span>
+        </button>
+        <button class="sb-panel-row" type="button" data-page-node-id="bGv7YdKoaPvcbqpW8XeW5q">
+          <svg class="ic" width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="ujFpCBY4obsrMjNt5kaB7a"><use href="#i-trajectory" data-page-node-id="N71UCRFshBjGKgOdgcjRAE"/></svg>
+          <span class="sb-panel-title sb-wide" data-page-node-id="uG9QLw6RQwBnkUt0lskXLY">轨迹</span>
+        </button>
+        <button class="sb-panel-row" type="button" data-page-node-id="wOkzJMVCkLfDjwkdo88yKB">
+          <svg class="ic" width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" data-page-node-id="v5QeZPZ3vSGGpIH3m8PoZ6"><use href="#i-settings" data-page-node-id="nqeCBFPQPs1YHvnaEDEkIF"/></svg>
+          <span class="sb-panel-title sb-wide" data-page-node-id="kegfXQQF379jOtrKwqrvEo">设置</span>
+        </button>
+      </nav>
+
+      <div class="sb-region" data-page-node-id="yJCSAVIyA35UUeq3NXasVm">
+        <div class="sb-group-label sb-wide" data-page-node-id="CfEDAqqlCYPACaNKDNd5bx">
+          <svg class="ic" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="PBzGe2YEdByXx5GMjxF0o4"><use href="#i-chevron-down" data-page-node-id="lywAtrhsUurZpgt7j3lgPn"/></svg>
+          agent_runner
+        </div>
+        <div class="sb-list" data-page-node-id="0F2mPfAJ4ZkatKzRXeCRqW">
+          <button class="sb-session" type="button" data-state="running" data-page-node-id="KNPoBBFT0CWqnbeObCWMkY">
+            <span class="sb-session-head" data-page-node-id="pW6mVm3X1USwPRuGAjN3sM">
+              <span class="sb-session-title" data-page-node-id="904yNfLFFSv0UfGKZjkWZc">插件装载路径重构</span>
+              <span class="sb-dot" data-page-node-id="yPCxroEqwkrCPCugUoNHWC"></span>
+            </span>
+            <span class="sb-session-preview" data-page-node-id="P9g19inLuEPSATy8GjWAjz">先枚举当前所有装载入口，再统一到一处</span>
+          </button>
+          <button class="sb-session" type="button" data-state="failed" data-page-node-id="KuPmA14mDswDwFwPF5OOHS">
+            <span class="sb-session-head" data-page-node-id="uSqmZ2FdLgzeXRJP6twiQu">
+              <span class="sb-session-title" data-page-node-id="evye4F2CiSJC2Xd9W75I3l">时间排序校验</span>
+              <span class="sb-dot" data-page-node-id="rBbk4YeNsemHvK7dyCL76Y"></span>
+            </span>
+            <span class="sb-session-preview" data-page-node-id="PahFk4xeINegiPyMvBcHHj">断言未通过：expected ts[1] &gt;= ts[0]</span>
+          </button>
+          <button class="sb-session" type="button" data-state="idle" data-page-node-id="iqhPbF9UWYZhdS7dv9tKO0">
+            <span class="sb-session-head" data-page-node-id="Xkn2TaXF0kWXRzJUKUVAd4">
+              <span class="sb-session-title" data-page-node-id="GVuGiKHoBpyHQwMUQ01qfg">登录态丢失定位与修复</span>
+              <span class="sb-dot" data-page-node-id="3IMjlphDetkErAGn9Fgxk8"></span>
+            </span>
+            <span class="sb-session-preview" data-page-node-id="Uvcx5dqlXiMbHWmThFIcKF">写入与读取落在两个不同的 Storage</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="sb-foot" data-page-node-id="mvXJaSFq2mgA6nQpqz9l5F">
+        <button class="sb-panel-row" type="button" id="toggleTheme" title="切换深浅主题" data-page-node-id="vHNelLxInV3Sc2sF8FIikI">
+          <svg class="ic" width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" data-page-node-id="umkGxaWuC7hyrKr2bPy1Pc"><use href="#i-brand" data-page-node-id="r7hBdCNDM0CkE27uQXTWdK"/></svg>
+          <span class="sb-panel-title sb-wide" data-page-node-id="bTwzGanFofjip4F8cAVT2k">外观</span>
+        </button>
+        <button class="sb-panel-row" type="button" data-page-node-id="ZDa2GizEU1OOgHhHZ2gfaF">
+          <svg class="ic" width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" data-page-node-id="6CfN6sBAAOaXV8bD1qdoRS"><use href="#i-settings" data-page-node-id="wqpJM3n0CiYkGQRs2MEwfe"/></svg>
+          <span class="sb-panel-title sb-wide" data-page-node-id="Fz5aVAWnvU379P3drPA3Nm">设置</span>
+        </button>
+      </div>
+    </aside>
+  </div>
+
+  <!-- ---------- 中栏：首屏相位 ---------- -->
+  <div class="af-center-col" data-page-node-id="c5EACw8Tqqqb5jG7ZpEXK6">
+    <div class="cv-root" data-phase="hero" data-page-node-id="pvfQWvKm3lCrSKr2O2Vlxm">
+      <div class="cv-body" data-page-node-id="Vpr6DIiOYajHGEHBZoMA5M">
+        <div class="cv-scroll ch-scroll" data-page-node-id="EtIB9oEBiKRCMBf3LsvbtV">
+
+          <div class="sh-root" data-page-node-id="1iiazMrcvK9yuTBxDG0bDY">
+            <div class="sh-stack" data-page-node-id="ApKJx2vRugOE6gDeSn8uam">
+
+              <!-- 鱼 + 标题 + 预览版徽标，26/32 500，居中 -->
+              <div class="sh-headline" data-page-node-id="rLjcdlRfRsZfavCT3whjSd">
+                <span class="sh-fish-hitbox" data-page-node-id="YzBISAvCluG1YMDBO9G0EF">
+                  <svg class="sh-fish" width="30" height="30" viewBox="0 0 24 24" aria-hidden="true" data-page-node-id="qhqQvahrwicyq6IH13Qi8b"><use href="#i-whale" data-page-node-id="kn7XHMlWJ2HxIIIOIC6GkQ"/></svg>
+                </span>
+                <span class="sh-title-group" data-page-node-id="E8RnElfh3OyABbmsDkrOvG">
+                  <span data-page-node-id="hai0KdaszMV9dsKPsf0LI9">探索未至之境</span>
+                  <span class="sh-preview-badge" data-page-node-id="f1Q0iQ6A2YpEJm1LQJGpss">预览版</span>
+                </span>
+              </div>
+
+              <!-- 工作区 chip：静止无底，悬停才给 -->
+              <div class="sh-workspace-row" data-page-node-id="E6AcwmrzxehoY5PEKBv2mK">
+                <button class="sh-workspace" type="button" data-page-node-id="b5iLwjuwej2JwiFGpz18oS">
+                  <svg class="ic sh" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" data-page-node-id="Pq33g0NS4cwyEyaj1iHHKt"><use href="#i-folder" data-page-node-id="KOCe1AzMJ4eWdWEn633kWt"/></svg>
+                  <span class="sh-workspace-label" data-page-node-id="kZ4JzP8ty3CupxbGtU5ePG">agent_runner</span>
+                  <svg class="ic sh-chevron" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="obk0jSUnSt84sxax2RoE8s"><use href="#i-chevron-down" data-page-node-id="BZr4nHGjaMubfCLRA8N1ue"/></svg>
+                </button>
+              </div>
+
+              <!-- 与停靠态同一张输入卡，只是处于居中栈里 -->
+              <div class="ib-card" id="composer" data-page-node-id="yVqKpn8OBL7GbYWCahx3hH">
+                <div class="ib-scroll" data-page-node-id="2AkOkXmmHY2ez7cX7qLTDD">
+                  <div class="ib-grow" data-page-node-id="WrA5BbAt1CZ0Fa9XCoLt3V">
+                    <div class="ib-input" id="draft" contenteditable="true" role="textbox"
+                         data-placeholder="描述你想要构建的内容, / 调用指令, @ 文件或对话" data-page-node-id="X5hFemQx0IMRtXYU9DnUAv"></div>
+                  </div>
+                </div>
+                <div class="ib-row" data-page-node-id="ZtApNd1thPapRD5RqG1WI0">
+                  <div class="ib-tools" data-page-node-id="cGCniusBbYoJxJxI5menpU">
+                    <button class="ib-add" type="button" title="添加附件" data-page-node-id="HK1OhpMaig5BFj0PntQiRl">
+                      <svg class="ic" width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" data-page-node-id="j1FGwShiSPP6pMeUE09VGC"><use href="#i-plus" data-page-node-id="8peSRqHIXUpWQhWsNbl5Z5"/></svg>
+                    </button>
+                    <select class="ib-select" title="模式" data-page-node-id="FDR8yGy1vAgBQMwv3PRxx3">
+                      <option data-page-node-id="tIMp0Eq3NDga8HachwjUPb">标准</option>
+                      <option data-page-node-id="9tTaZcJzivIMAT9d5w70ZA">Plan</option>
+                      <option data-page-node-id="yHE0PxzD5hidAWUenp8dPv">只读</option>
+                    </select>
+                  </div>
+                  <div class="ib-trailing" data-page-node-id="vllb6YgCzc4vxmOyyDRqIw">
+                    <select class="ib-select" title="模型" data-page-node-id="qTu4C9ZgFLD6n6FAFNiNOA">
+                      <option data-page-node-id="tVtAle42gVyq8ucCDrV0ir">deepseek-v4</option>
+                      <option data-page-node-id="ibCv65TuqEOkUOwe4oxqFq">deepseek-v4-flash</option>
+                    </select>
+                    <button class="ib-send" type="button" title="发送" data-page-node-id="KXGfPCiZ60CBxvLoLI418r">
+                      <svg class="ic" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="F3TTh5GE04PFThVfzHbApG"><use href="#i-send" data-page-node-id="sqwiafw3jOpSLNTzIELlXA"/></svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ---------- 右栏（收起态，轨道为零） ---------- -->
+  <div class="af-rightbar-col" data-page-node-id="VkyVF2lqrzWAhvWing5pL7"></div>
+
+</div>
+
+<script>
+(function () {
+  var frame = document.getElementById('frame')
+  var sidebar = document.getElementById('sidebar')
+
+  document.getElementById('toggleTheme').addEventListener('click', function () {
+    if (document.body.hasAttribute('data-ds-dark-theme')) document.body.removeAttribute('data-ds-dark-theme')
+    else document.body.setAttribute('data-ds-dark-theme', '')
+  })
+
+  document.getElementById('toggleSidebar').addEventListener('click', function () {
+    if (sidebar.hasAttribute('data-collapsed')) {
+      sidebar.removeAttribute('data-collapsed')
+      frame.removeAttribute('data-sidebar-collapsed')
+    } else {
+      sidebar.setAttribute('data-fading', '')
+      setTimeout(function () {
+        sidebar.setAttribute('data-collapsed', '')
+        sidebar.removeAttribute('data-fading')
+        frame.setAttribute('data-sidebar-collapsed', '')
+      }, 150)
+    }
+  })
+
+  var draft = document.getElementById('draft')
+  var composer = document.getElementById('composer')
+  function syncEmpty() {
+    if (draft.textContent.trim() === '') composer.setAttribute('data-empty', '')
+    else composer.removeAttribute('data-empty')
+  }
+  draft.addEventListener('input', syncEmpty)
+  syncEmpty()
+})()
+</script>
+
+</body>
+</html>
