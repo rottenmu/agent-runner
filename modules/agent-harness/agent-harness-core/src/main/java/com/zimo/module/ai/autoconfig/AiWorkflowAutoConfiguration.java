@@ -1,6 +1,7 @@
 package com.zimo.module.ai.autoconfig;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.zimo.module.ai.WorkflowPluginRegister;
 import com.zimo.module.ai.mapper.WfTemplateMapper;
 import com.zimo.module.ai.mapper.WfWorkflowMapper;
 import com.zimo.module.ai.mapper.WfWorkflowRunLogMapper;
@@ -64,5 +65,15 @@ public class AiWorkflowAutoConfiguration {
     @ConditionalOnMissingBean
     public WfTemplateService wfTemplateService(WfTemplateMapper templateMapper) {
         return new WfTemplateService(templateMapper);
+    }
+
+    /**
+     * 工作流插件身份：让 {@code GET /api/plugins} 能列出本模块，并与前端
+     * {@code localPluginModules.workflow} 对齐（此前只能靠前端硬编码兜底）。
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public WorkflowPluginRegister workflowPluginRegister() {
+        return new WorkflowPluginRegister();
     }
 }

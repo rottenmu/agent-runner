@@ -3,6 +3,7 @@ package com.zimo.module.ai.observ;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.zimo.framework.ai.observ.TraceCollector;
 import com.zimo.framework.ai.observ.TraceObserver;
+import com.zimo.module.ai.schema.SchemaDdl;
 import jakarta.annotation.PostConstruct;
 import java.util.HashMap;
 import java.util.List;
@@ -42,25 +43,9 @@ public class SessionEventLogServiceImpl implements SessionEventLogService, Trace
     /** 建表（幂等）+ 注册观测者。 */
     @PostConstruct
     public void init() {
-        jdbcTemplate.execute("""
-                CREATE TABLE IF NOT EXISTS observ_session_event (
-                  id INTEGER PRIMARY KEY AUTOINCREMENT,
-                  trace_id VARCHAR(64) NOT NULL,
-                  session_id VARCHAR(128),
-                  agent_name VARCHAR(128),
-                  seq INTEGER NOT NULL DEFAULT 0,
-                  event_type VARCHAR(16) NOT NULL,
-                  step_type VARCHAR(32),
-                  name VARCHAR(255),
-                  input_text CLOB,
-                  output_text CLOB,
-                  status VARCHAR(32),
-                  tokens INTEGER DEFAULT 0,
-                  latency_ms BIGINT DEFAULT 0,
-                  event_ts BIGINT NOT NULL
-                )""");
-        jdbcTemplate.execute(
-                "CREATE INDEX IF NOT EXISTS idx_obs_evt_trace ON observ_session_event(trace_id)");
+        SchemaDdl ddl = SchemaDdl.detect(jdbcTemplate);
+        jdbcTemplate.execute(ddl.mysql() ? MYSQL_DDL : SQLITE_DDL);
+        ddl.ensureIndex(jdbcTemplate, "observ_session_event", "idx_obs_evt_trace", "trace_id");
         TraceCollector.register(this);
         log.info("[session-event-log] SessionEventLogService registered (append-only)");
     }
@@ -191,4 +176,50 @@ public class SessionEventLogServiceImpl implements SessionEventLogService, Trace
     private static String safe(String s) {
         return s == null ? "" : s;
     }
+
+    /* ================= 建表 DDL（方言分支） ================= */
+
+    /** SQLite 方言建表语句（本地默认数据源）。 */
+    private static final String SQLITE_DDL = """
+            CREATE TABLE IF NOT EXISTS observ_session_event (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              trace_id VARCHAR(64) NOT NULL,
+              session_id VARCHAR(128),
+              agent_name VARCHAR(128),
+              seq INTEGER NOT NULL DEFAULT 0,
+              event_type VARCHAR(16) NOT NULL,
+              step_type VARCHAR(32),
+              name VARCHAR(255),
+              input_text CLOB,
+              output_text CLOB,
+              status VARCHAR(32),
+              tokens INTEGER DEFAULT 0,
+              latency_ms BIGINT DEFAULT 0,
+              event_ts BIGINT NOT NULL
+            )""";
+
+    /**
+     * MySQL 方言建表语句。
+     *
+     * <p>与 SQLite 版的两处差异都是**硬错误**而不是风格差异：{@code AUTOINCREMENT} 在 MySQL
+     * 是语法错（应为 {@code AUTO_INCREMENT}），{@code CLOB} 不是 MySQL 类型（应为 {@code TEXT}）。
+     * 字段长度须与版本脚本 {@code V1.0.1__observ_session_event.sql} 一致。</p>
+     */
+    static final String MYSQL_DDL = """
+            CREATE TABLE IF NOT EXISTS observ_session_event (
+              id BIGINT AUTO_INCREMENT PRIMARY KEY,
+              trace_id VARCHAR(64) NOT NULL,
+              session_id VARCHAR(128),
+              agent_name VARCHAR(128),
+              seq INT NOT NULL DEFAULT 0,
+              event_type VARCHAR(16) NOT NULL,
+              step_type VARCHAR(32),
+              name VARCHAR(255),
+              input_text TEXT,
+              output_text TEXT,
+              status VARCHAR(32),
+              tokens INT DEFAULT 0,
+              latency_ms BIGINT DEFAULT 0,
+              event_ts BIGINT NOT NULL
+            )""";
 }

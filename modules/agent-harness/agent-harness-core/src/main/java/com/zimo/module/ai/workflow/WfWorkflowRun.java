@@ -25,7 +25,14 @@ public class WfWorkflowRun {
     /** 定义快照（运行期间不可变） */
     private String definitionJson;
 
-    /** 状态：running/paused/manual_wait/success/failed/canceled */
+    /**
+     * 状态。
+     *
+     * <p>图引擎的终态有 5 种：{@code success}（正常结束）、{@code suspended}（等人审，可 approve 恢复）、
+     * {@code failed}（未走完）、{@code canceled}、{@code conflict}（走完但存在非成功回执，
+     * 部分失败待人工裁决，<b>不等同于 failed</b>）。{@code running} 为非终态。
+     * 旧的工单式引擎还会写 {@code paused}/{@code manual_wait}。</p>
+     */
     private String status = "running";
 
     /** 当前所在节点 ID */

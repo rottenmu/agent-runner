@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,6 +42,15 @@ public class ChatTurnMemoryRecorder {
     private final ChatMemoryRecorderProperties properties;
     private final ThreadPoolExecutor executor;
     private final AtomicLong turnSeq = new AtomicLong();
+
+    /** 连续写入失败计数：用于区分"偶发抖动"与"持续不可用"，避免只打 WARN 被忽略。 */
+    private final AtomicInteger consecutiveFailures = new AtomicInteger();
+    /** 累计写入失败次数（含瞬时抖动），供健康快照使用。 */
+    private final AtomicLong totalFailures = new AtomicLong();
+    /** 因队列满/已关闭而丢弃的记录数。 */
+    private final AtomicLong droppedTurns = new AtomicLong();
+    /** 连续失败达到该阈值即升级为 ERROR 日志，确保"记忆服务不可用"不会被静默吞掉。 */
+    private static final int FAILURE_ALERT_THRESHOLD = 5;
 
     public ChatTurnMemoryRecorder(MemoryMcpClient client, ChatMemoryRecorderProperties properties) {
         this.client = client;
@@ -84,7 +94,8 @@ public class ChatTurnMemoryRecorder {
             executor.execute(() -> write(tenantId, userId, sessionId, seq, content));
         } catch (Exception e) {
             // 队列满（AbortPolicy）或已关闭：丢弃并告警。丢一条记忆远好过拖慢或中断对话
-            log.warn("[对话记忆] 入队失败，本轮不记录 (sessionId={}): {}", sessionId, e.toString());
+            long dropped = droppedTurns.incrementAndGet();
+            log.warn("[对话记忆] 入队失败，本轮不记录 (sessionId={}，累计丢弃 {} 条): {}", sessionId, dropped, e.toString());
         }
     }
 
@@ -99,11 +110,24 @@ public class ChatTurnMemoryRecorder {
         args.put("content", content);
         try {
             Map<String, Object> result = client.callTool(TOOL_WRITE, args);
+            if (consecutiveFailures.get() > 0) {
+                log.info("[对话记忆] 写入已恢复正常（此前累计失败 {} 次）", totalFailures.get());
+                consecutiveFailures.set(0);
+            }
             log.debug("[对话记忆] 已记录 sessionId={} key={} sensitiveMasked={}",
                     sessionId, args.get("key"), result.get("sensitiveMasked"));
         } catch (Exception e) {
             // 记录失败不影响对话，但必须留下线索，否则「记忆页一直是空的」无从排查
-            log.warn("[对话记忆] 写入失败 sessionId={}：{}", sessionId, e.getMessage());
+            int n = consecutiveFailures.incrementAndGet();
+            totalFailures.incrementAndGet();
+            if (n >= FAILURE_ALERT_THRESHOLD) {
+                log.error("[对话记忆] 写入已连续失败 {} 次（累计 {} 次）！请检查 agent-memory 服务是否存活、"
+                        + "MCP 端点连通性，以及令牌配置（ai.chat-recorder.token 须与 agent-memory.mcp-token 一致）。"
+                        + "最近一次错误：{}", n, totalFailures.get(), e.getMessage());
+                consecutiveFailures.set(0);
+            } else {
+                log.warn("[对话记忆] 写入失败 sessionId={}：{}", sessionId, e.getMessage());
+            }
         }
     }
 
@@ -132,6 +156,17 @@ public class ChatTurnMemoryRecorder {
             return text;
         }
         return text.substring(0, max) + "…[已截断，原文 " + text.length() + " 字]";
+    }
+
+    /** 记忆写入健康快照：最近一轮无连续失败即视为健康，供健康端点/监控接入。 */
+    public boolean isHealthy() {
+        return consecutiveFailures.get() == 0;
+    }
+
+    /** 暴露失败计数快照，便于排查与监控（例如接到 Actuator 健康端点）。 */
+    public String getStats() {
+        return String.format("healthy=%s, consecutiveFailures=%d, totalFailures=%d, droppedTurns=%d",
+                isHealthy(), consecutiveFailures.get(), totalFailures.get(), droppedTurns.get());
     }
 
     /** 关闭线程池（应用下线时调用）。 */
