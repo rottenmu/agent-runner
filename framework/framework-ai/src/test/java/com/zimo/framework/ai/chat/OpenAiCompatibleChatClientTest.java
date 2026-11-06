@@ -1,6 +1,6 @@
 package com.zimo.framework.ai.chat;
 
-import com.zimo.module.agentmemory.chat.AiChatMessage;
+import com.zimo.agent.memory.chat.AiChatMessage;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;

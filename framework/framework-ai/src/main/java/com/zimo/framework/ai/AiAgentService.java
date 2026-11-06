@@ -1,5 +1,8 @@
 package com.zimo.framework.ai;
 
+import com.zimo.agent.memory.engine.MemoryAwarePromptBuilder;
+import com.zimo.agent.memory.engine.MemoryScope;
+import com.zimo.agent.memory.storage.OltpMemoryRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -9,11 +12,11 @@ import com.zimo.framework.ai.agent.AiAgentRouteRequest;
 import com.zimo.framework.ai.agent.AiHarnessAgentRegistry;
 import com.zimo.framework.ai.agent.AiHarnessAgentRouter;
 import com.zimo.framework.ai.agent.AiHarnessSessionKeyFactory;
-import com.zimo.module.agentmemory.chat.AiChatMessage;
+import com.zimo.agent.memory.chat.AiChatMessage;
 import com.zimo.framework.ai.chat.AiChatClient;
 import com.zimo.framework.ai.chat.AiChatRequest;
 import com.zimo.framework.ai.chat.AiChatResponse;
-import com.zimo.module.agentmemory.chat.AiConversationMemory;
+import com.zimo.agent.memory.chat.AiConversationMemory;
 import com.zimo.framework.ai.runtime.AiAgentRuntime;
 import com.zimo.framework.ai.runtime.AiAgentRuntimeStatus;
 import com.zimo.framework.ai.skill.AiSkillRegistry;
@@ -49,7 +52,7 @@ public class AiAgentService {
     private final AiHarnessAgentRegistry registry;
     private final AiHarnessSessionKeyFactory sessionKeyFactory;
     private final AiConversationMemory conversationMemory;
-    private final com.zimo.module.agentmemory.storage.OltpMemoryRepository oltpMemoryRepository;
+    private final OltpMemoryRepository oltpMemoryRepository;
     private final com.zimo.framework.common.ai.event.AiEventPublisher eventPublisher;
     /** 请求拦截器链（对应 dsh agent/pre-step 权威决策点）：任一 DENY 即终止请求。 */
     private final List<com.zimo.framework.ai.agent.AiRequestInterceptor> requestInterceptors;
@@ -63,7 +66,7 @@ public class AiAgentService {
      * <p>为什么用「可空装配」而不是必需依赖：记忆是<b>增强</b>能力，未接入记忆模块的部署
      * 不应因为缺这个 Bean 而起不来。装配侧用 {@code ObjectProvider#getIfAvailable} 取。</p>
      */
-    private final com.zimo.module.agentmemory.engine.MemoryAwarePromptBuilder memoryAwarePromptBuilder;
+    private final MemoryAwarePromptBuilder memoryAwarePromptBuilder;
     /**
      * 计划模式回写协调器（M4-2b，可空）：驳回守卫 + 程序性经验回写。
      *
@@ -101,7 +104,7 @@ public class AiAgentService {
             AiHarnessAgentRegistry registry,
             AiHarnessSessionKeyFactory sessionKeyFactory,
             com.zimo.framework.common.storage.FileStorageService fileStorageService,
-            com.zimo.module.agentmemory.storage.OltpMemoryRepository oltpMemoryRepository,
+            OltpMemoryRepository oltpMemoryRepository,
             com.zimo.framework.common.ai.event.AiEventPublisher eventPublisher,
             List<com.zimo.framework.ai.agent.AiRequestInterceptor> requestInterceptors,
             List<com.zimo.framework.ai.agent.AiAgentMiddleware> middlewares) {
@@ -124,7 +127,7 @@ public class AiAgentService {
             AiHarnessAgentRegistry registry,
             AiHarnessSessionKeyFactory sessionKeyFactory,
             com.zimo.framework.common.storage.FileStorageService fileStorageService,
-            com.zimo.module.agentmemory.storage.OltpMemoryRepository oltpMemoryRepository,
+            OltpMemoryRepository oltpMemoryRepository,
             com.zimo.framework.common.ai.event.AiEventPublisher eventPublisher,
             List<com.zimo.framework.ai.agent.AiRequestInterceptor> requestInterceptors,
             List<com.zimo.framework.ai.agent.AiAgentMiddleware> middlewares,
@@ -149,12 +152,12 @@ public class AiAgentService {
             AiHarnessAgentRegistry registry,
             AiHarnessSessionKeyFactory sessionKeyFactory,
             com.zimo.framework.common.storage.FileStorageService fileStorageService,
-            com.zimo.module.agentmemory.storage.OltpMemoryRepository oltpMemoryRepository,
+            OltpMemoryRepository oltpMemoryRepository,
             com.zimo.framework.common.ai.event.AiEventPublisher eventPublisher,
             List<com.zimo.framework.ai.agent.AiRequestInterceptor> requestInterceptors,
             List<com.zimo.framework.ai.agent.AiAgentMiddleware> middlewares,
             com.zimo.framework.ai.plugin.PluginEventBus pluginEventBus,
-            com.zimo.module.agentmemory.engine.MemoryAwarePromptBuilder memoryAwarePromptBuilder) {
+            MemoryAwarePromptBuilder memoryAwarePromptBuilder) {
         this(properties, skillRegistry, runtime, chatClient, router, registry, sessionKeyFactory,
                 fileStorageService, oltpMemoryRepository, eventPublisher, requestInterceptors,
                 middlewares, pluginEventBus, memoryAwarePromptBuilder, null);
@@ -177,12 +180,12 @@ public class AiAgentService {
             AiHarnessAgentRegistry registry,
             AiHarnessSessionKeyFactory sessionKeyFactory,
             com.zimo.framework.common.storage.FileStorageService fileStorageService,
-            com.zimo.module.agentmemory.storage.OltpMemoryRepository oltpMemoryRepository,
+            OltpMemoryRepository oltpMemoryRepository,
             com.zimo.framework.common.ai.event.AiEventPublisher eventPublisher,
             List<com.zimo.framework.ai.agent.AiRequestInterceptor> requestInterceptors,
             List<com.zimo.framework.ai.agent.AiAgentMiddleware> middlewares,
             com.zimo.framework.ai.plugin.PluginEventBus pluginEventBus,
-            com.zimo.module.agentmemory.engine.MemoryAwarePromptBuilder memoryAwarePromptBuilder,
+            MemoryAwarePromptBuilder memoryAwarePromptBuilder,
             com.zimo.framework.ai.memory.PlanWritebackCoordinator planWritebackCoordinator) {
         this(properties, skillRegistry, runtime, chatClient, router, registry, sessionKeyFactory,
                 fileStorageService, oltpMemoryRepository, eventPublisher, requestInterceptors,
@@ -204,12 +207,12 @@ public class AiAgentService {
             AiHarnessAgentRegistry registry,
             AiHarnessSessionKeyFactory sessionKeyFactory,
             com.zimo.framework.common.storage.FileStorageService fileStorageService,
-            com.zimo.module.agentmemory.storage.OltpMemoryRepository oltpMemoryRepository,
+            OltpMemoryRepository oltpMemoryRepository,
             com.zimo.framework.common.ai.event.AiEventPublisher eventPublisher,
             List<com.zimo.framework.ai.agent.AiRequestInterceptor> requestInterceptors,
             List<com.zimo.framework.ai.agent.AiAgentMiddleware> middlewares,
             com.zimo.framework.ai.plugin.PluginEventBus pluginEventBus,
-            com.zimo.module.agentmemory.engine.MemoryAwarePromptBuilder memoryAwarePromptBuilder,
+            MemoryAwarePromptBuilder memoryAwarePromptBuilder,
             com.zimo.framework.ai.memory.PlanWritebackCoordinator planWritebackCoordinator,
             com.zimo.framework.ai.agent.memory.AgentStateTaskPartitionProbe taskPartitionProbe) {
         this.taskPartitionProbe = taskPartitionProbe;
@@ -259,7 +262,7 @@ public class AiAgentService {
         }
         String agentType = profile == null ? null : profile.agentType();
         com.zimo.framework.ai.memory.MemoryPromptMiddleware.bindContext(context,
-                com.zimo.module.agentmemory.engine.MemoryScope.of(
+                MemoryScope.of(
                         routeRequest.tenantId(), routeRequest.userId(),
                         routeRequest.conversationId(), agentType),
                 query);
@@ -280,7 +283,7 @@ public class AiAgentService {
                                  RuntimeContext context, AiAgentProfile profile) {
         if (memoryAwarePromptBuilder != null) {
             memoryAwarePromptBuilder.afterReply(
-                    com.zimo.module.agentmemory.engine.MemoryScope.of(
+                    MemoryScope.of(
                             routeRequest.tenantId(), routeRequest.userId(),
                             routeRequest.conversationId()),
                     traceId, userMessage, reply);
@@ -288,7 +291,7 @@ public class AiAgentService {
         if (planWritebackCoordinator != null) {
             // 计划模式另外回写一条程序性记忆；被驳回时不写（守卫在协调器内部）
             planWritebackCoordinator.afterPlan(
-                    com.zimo.module.agentmemory.engine.MemoryScope.of(
+                    MemoryScope.of(
                             routeRequest.tenantId(), routeRequest.userId(),
                             routeRequest.conversationId(),
                             profile == null ? null : profile.agentType()),
@@ -1037,7 +1040,7 @@ public class AiAgentService {
      * 全部失败返回空串，由调用方回退为保持会话记忆不变。</p>
      */
     private String summarizeWithRetry(
-            java.util.List<com.zimo.module.agentmemory.chat.AiChatMessage> messages,
+            java.util.List<AiChatMessage> messages,
             int maxCharacters,
             int maxRetries) {
         int attempts = Math.max(0, maxRetries) + 1;

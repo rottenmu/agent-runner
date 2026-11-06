@@ -1,277 +1,114 @@
-# Production Studio
+# agent_runner
 
-`agent_runner` 是一个面向生产管理场景的插件化平台工程。后端采用 Java 17、Spring Boot 3 和 Maven 多模块组织，前端采用 Vue 3、Vite 和主壳插件模块架构。
+`agent_runner` 是一个面向 AI Agent 运行场景的插件化平台工程。后端采用 Java 17、Spring Boot 3.4.5 和 Maven 多模块组织，前端采用 Vue 3、Vite 和「单一主壳 + 源码级插件模块」架构。
 
-当前工程的核心方向是：
+当前工程的核心方向：
 
 - 后端保留插件平台能力，不收敛为不可扩展的单体应用。
-- 前端保留一个主壳应用，由主壳动态加载各子平台的菜单、路由和页面模块。
-- AI、制造项目管理、系统管理、示例模块等能力以插件或 starter 模式接入主项目。
+- 前端保留一个主壳应用，由主壳动态加载各插件的菜单、路由和页面模块。
+- AI 智能体、对话、图编排、长期记忆、工具治理、RAG、意图识别、飞书集成等能力以插件模式接入主项目。
+
+> ⚠️ **与历史文档的偏差（重要）**：早期 README / AGENTS.md 中提到的 `admin-shell`、`module-ai`、`module-demo`、`module-wms`、`xingju-project-mgmt-starter`、`ai-agent-spring-boot-starter` 等模块**均已不存在**，以本文档的模块清单为准。
 
 ## 工程结构
 
 ```text
 agent_runner
-├─ framework/          共享框架能力
-├─ modules/            业务插件、独立模块和可复用 starter
-├─ admin-shell/        后端主应用装配层
+├─ framework/          共享框架能力（common / autoconfig / ai）
+├─ modules/            业务插件与独立模块
+├─ agent-application/  后端主应用装配层（唯一 Spring Boot 主入口）
 ├─ frontend/
 │  ├─ web-shell/       前端主壳应用
-│  └─ modules/         前端插件模块
-├─ agents/             可选 AgentScope Python sidecar
-├─ docs/               架构设计和实施计划
+│  └─ modules/         前端插件模块（源码级）
+├─ data/               本地运行数据（SQLite / H2 / RocksDB / Arrow OLAP）
+├─ docs/               架构设计与实施计划
 └─ AGENTS.md           仓库协作规范
 ```
 
 ## 后端架构
 
-根 Maven 工程聚合三个主要层次：
+根 Maven 工程聚合三个层次：`framework` / `modules` / `agent-application`。
 
-```text
-framework
-modules
-admin-shell
-```
+### framework（平台级共享能力）
 
-### framework
+| 模块 | 职责 |
+|---|---|
+| `framework-common` | 统一返回体 `R`/`ApiResponse`、分页、错误码、通用异常、`PluginRegister` 插件契约、`PluginRegistry`（`GET /api/plugins`）、校验工具、AI skill 抽象、文件存储、AI 事件发布 |
+| `framework-autoconfig` | 全局自动配置：MyBatis-Plus、Web、API 注册表、存储（RocksDB / 文件） |
+| `framework-ai` | AI 运行时 starter：agent 工厂/路由/运行时、`AiChatClient`/`OpenAiCompatibleChatClient`、skill、`ToolBridge`、MCP、A2A、可观测、记忆中间件 |
 
-`framework/` 放置平台级共享能力：
+### modules（业务插件）
 
-- `framework-common`：通用响应、分页、异常、插件注册接口等基础模型。
-- `framework-autoconfig`：插件发现接口、MyBatis-Plus 配置、Web 通用配置等。
-- `module-auth`：用户身份模型、登录注册、Sa-Token 会话、登录拦截和认证异常处理。
+| 模块 | 定位 | 后端 pluginId / 前缀 |
+|---|---|---|
+| `module-sys` | 系统管理：用户/角色/RBAC/菜单/智能体设置/API 注册表 | `sys` / `/api/biz/sys`（order 6） |
+| `agent-auth` | 登录/注册/Sa-Token 会话（强依赖 `module-sys` 的 `SysUser` 表） | — |
+| `agent-harness` | 最大模块：对话/图引擎/工作流/技能/工具/模型配置/协作审批/MCP/A2A | `ai` / `/api/ai`（order 4） |
+| `agent-datasource` | 数据源管理 + 通用存储 SPI（被 `agent-memory` 复用） | — |
+| `agent-rag` | 检索增强 | — |
+| `agent-intent` | 意图识别（规则引擎 + 可选 LLM 解析器） | — |
+| `module-tools` | 工具治理（权限/限流/熔断/审计） | — |
+| `module-security` | 安全治理 | — |
+| `agent-trace` | 链路追踪（OTel / observer） | — |
+| `agent-memory` | 四层记忆（L0~L3）+ H2(OLTP)/Arrow(OLAP) 双存储；另含独立可运行子应用 `agent-memory-application` | — |
+| `module-feishu` | 飞书机器人/事件/凭证 | `feishu` / `/api/feishu`（order 5） |
 
-插件核心契约是 `PluginRegister`，每个插件通过它声明：
+> 模块实际只拆成 `*-core`（自动配置以 `…autoconfig` 子包内嵌，并非独立 `*-autoconfig` 子模块）。`agent-application` 的 `pom.xml` 直接依赖各业务模块的 `-core`。
 
-```text
-pluginId
-pluginName
-apiPrefix
-frontendRoute
-frontendModule
-agentName
-order
-```
+### agent-application（主应用装配层）
 
-`PluginRegistry` 对外提供插件发现接口：
+- 唯一 `@SpringBootApplication` 主类：`com.zimo.agentapplication.AgentApplication`。
+- 主类**不自定义 `@ComponentScan`**，完全靠各 jar 的 `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports` 装配。
+- 全局配置集中点：`CorsConfig`、`GlobalExceptionHandler`、`DataInitializer`、`application.yml`。
+- 默认端口：**9900**。
+
+## 插件发现机制（前后端契约）
+
+后端通过 `PluginRegister` 声明插件身份（pluginId / 名称 / apiPrefix / frontendRoute / frontendModule / agentName / order）。`PluginRegistry` 暴露：
 
 ```text
 GET /api/plugins
 ```
 
-前端主壳通过该接口获取已启用插件，再根据 `frontendModule` 加载对应前端模块。
+当前后端实际注册的插件只有三个：`sys`、`ai`、`feishu`（其余模块为后端能力，未独立声明 PluginRegister）。
 
-### modules
-
-`modules/` 承载业务插件、starter 和部分独立服务模块。
-
-当前主要模块包括：
-
-| 模块 | 定位 |
-|---|---|
-| `module-sys` | 系统管理插件 |
-| `module-ai` | AI 智能体平台插件 |
-| `ai-agent-spring-boot-starter` | AI 智能体、技能、MCP、A2A 通用 starter 能力 |
-| `xingju-project-mgmt-starter` | 制造业项目管理平台插件聚合模块，内部包含 `xingju-project-mgmt-core` 和 `xingju-project-mgmt-autoconfig` |
-| `module-wms` | 仓储管理平台插件，承接 `inventory-mgmt` 的非 RFID Java 后端能力 |
-
-标准平台插件通常采用：
-
-```text
-module-xxx
-├─ module-xxx-core
-└─ module-xxx-autoconfig
-```
-
-其中：
-
-- `core` 放插件身份、实体、控制器、服务等核心业务代码。
-- `autoconfig` 放 Spring Boot 自动配置、插件注册 Bean 和配置开关。
-
-### admin-shell
-
-`admin-shell/` 是当前主后端应用入口。
-
-它负责：
-
-- 启动 Spring Boot 主应用。
-- 聚合框架自动配置。
-- 引入已启用业务插件。
-- 暴露统一认证、插件发现和业务接口。
-
-默认端口：
-
-```text
-18080
-```
-
-主应用当前通过 Maven 依赖接入：
-
-```text
-framework-autoconfig
-module-sys-autoconfig
-module-demo-autoconfig
-xingju-project-mgmt-autoconfig
-module-ai-autoconfig
-module-wms-autoconfig
-```
-
-## 前端架构
-
-前端采用“单一主壳 + 源码级插件模块”的组织方式。
-
-```text
-frontend
-├─ web-shell/          唯一主前端应用
-└─ modules/            各子平台前端模块
-```
-
-### web-shell
-
-`frontend/web-shell/` 是唯一主应用，负责：
-
-- 登录和退出。
-- token 存储。
-- 全局 Axios 请求封装。
-- 主布局。
-- Vue Router 实例和路由守卫。
-- 插件发现。
-- 菜单合并。
-- 动态路由注册。
-
-插件加载入口：
-
-```text
-frontend/web-shell/src/plugin-loader/plugin-loader.js
-frontend/web-shell/src/plugin-loader/local-modules.js
-```
-
-加载流程：
+前端主壳的加载流程：
 
 ```text
 用户登录
   ↓
 web-shell 调用 GET /api/plugins
   ↓
-读取后端插件元数据中的 frontendModule
+mergeShellDefaultPlugins(后端插件, 前端 shellDefaultPlugins)   ← 按 pluginId/frontendModule 去重合并
   ↓
-从 localPluginModules 找到本地前端模块
+按 frontendModule 从 localPluginModules 找到本地前端模块并 import()
   ↓
-合并模块 menus
-  ↓
-动态注册模块 routes
-  ↓
-在主布局 router-view 中渲染插件页面
+合并 menus / 动态注册 routes
 ```
 
-当前本地前端模块注册包括：
+前端 `frontend/web-shell/src/plugin-loader/` 下：
+
+- `local-modules.js`：`localPluginModules`（本地前端模块导入表）+ `shellDefaultPlugins`（前端侧默认插件清单，覆盖 workflow / datasource / rag / tools / agentmemory / agent-trace-ui）。
+- `plugin-loader.js`：`loadFrontendPlugins` / `resolvePluginModules` / `mergeShellDefaultPlugins`。
+
+**契约约束**：`shellDefaultPlugins` 中每个条目的 `frontendModule` 必须能在 `localPluginModules` 中找到对应 key；后端插件若没有对应前端模块（如 `sys` 的 UI 内置于主壳），加载器会跳过并给出提示，不影响其余插件。
+
+## 前端架构
 
 ```text
-sys
-demo
-manufacturing-pm
-ai
-wms
+frontend
+├─ web-shell/          唯一主前端应用（dev 端口 16600 / 预览端口 18000）
+└─ modules/            各子平台前端模块
+    ├─ ai/  feishu/  workflow/  datasource/  rag/  tools/  agentmemory/  agent-trace-ui/
 ```
 
-### frontend/modules
+每个前端插件模块导出 `index.js` / `menus.js` / `routes.js` / `src/views/`，由主壳动态合并菜单与路由。前端插件模块不应重复创建登录、全局布局、全局请求封装或主路由实例。
 
-每个前端插件模块负责导出自己的菜单、路由和页面组件。
+## 数据库与存储（与 AGENTS.md 规范的偏差说明）
 
-推荐结构：
-
-```text
-frontend/modules/xxx
-├─ index.js
-├─ menus.js
-├─ routes.js
-└─ src/views/
-```
-
-模块描述对象示例：
-
-```js
-export default {
-  pluginId: 'xxx',
-  name: '模块名称',
-  baseRoute: '/biz/xxx',
-  menus,
-  routes,
-  setup() {}
-}
-```
-
-前端插件模块不应该重复创建独立登录、全局布局、全局请求封装或主路由实例。
-
-## AI 模块
-
-AI 能力分为两层：
-
-```text
-modules/ai-agent-spring-boot-starter
-modules/module-ai
-```
-
-`ai-agent-spring-boot-starter` 提供通用能力：
-
-- `AiAgentProperties`
-- `AiSkill`
-- `AiSkillRegistry`
-- 默认技能
-- `AiAgentService`
-- MCP HTTP 适配
-- A2A HTTP 适配
-
-`module-ai` 负责作为平台插件挂入主项目：
-
-```text
-pluginId: ai
-apiPrefix: /api/ai
-frontendModule: ai
-agentName: ai-agent
-```
-
-当前实际接口包括：
-
-```text
-POST /api/ai/mcp
-GET  /api/ai/a2a/agent-card
-POST /api/ai/a2a/message
-```
-
-注意：早期设计文档中曾规划 `/api/ai/mcp/tools`、`/api/ai/a2a/tasks/send` 等路径，当前代码实现与该设计存在差异，后续如需对齐协议规范，应统一接口路径。
-
-## WMS 模块边界
-
-`modules/module-wms` 是仓储管理平台插件，同时承接 `inventory-mgmt` 的非 RFID Java 后端能力。
-
-当前结构：
-
-```text
-modules/module-wms
-├─ module-wms-core          WMS 业务接口、服务、Mapper、测试
-└─ module-wms-autoconfig    平台插件自动配置和插件注册
-```
-
-插件身份：
-
-```text
-pluginId: wms
-apiPrefix: /api/wms
-frontendRoute: /biz/wms
-frontendModule: wms
-agentName: wms-agent
-```
-
-它的长期边界是：
-
-- 只实现非 RFID 的库存、WMS、移动端、MRP 预览和 Agent 巡检预览。
-- 不新增 RFID Controller、Service、Mapper、路由、表或兼容空壳。
-- API 响应统一使用 `code/message/data`。
-- 作为平台插件运行时由 `admin-shell` 承载。
-- 独立运行配置保留在 `module-wms-core/src/main/resources/wms-standalone.yml`，不会作为依赖污染主应用配置。
-
-`frontend/modules/wms` 已提供主壳插件入口 `index.js`、`menus.js`、`routes.js`，当前主壳只接入非 RFID 菜单。目录中仍保留历史独立 Vite 应用文件和 RFID 页面，后续迁移时不要把 RFID 页面接入主壳菜单。
+- **平台主库当前使用 SQLite**（`application.yml` 中 `jdbc:sqlite:./data/agent_runner.db`，`MybatisPlusConfig` 用 `DbType.SQLITE`）。AGENTS.md 规定「禁用 SQLite/H2，只能 MySQL」——这是已知偏差：本地开发以 SQLite 跑通，生产切换 MySQL 仍需补做迁移与验证（本仓库无 Flyway/Liquibase，表结构由 `@PostConstruct` 内联 DDL 与 DAO `CREATE TABLE IF NOT EXISTS` 自举）。
+- **`agent-memory` 四层记忆**经用户明确批准使用嵌入式 H2（OLTP）+ Arrow/Calcite（OLAP），属进程内记忆存储的独立例外，其他模块不得复用。
+- **无数据库迁移工具**：全仓无 Flyway/Liquibase 依赖，`modules/agent-harness/.../db/V*__*.sql` 为尚未被加载器消费的孤儿脚本。
 
 ## 常用命令
 
@@ -284,14 +121,28 @@ mvn clean verify
 后端主应用打包：
 
 ```powershell
-mvn -pl admin-shell -am package
+mvn -pl agent-application -am package
 ```
 
-后端主应用运行：
+后端主应用运行（端口 9900）：
+
+先打出可执行 jar，再用仓库自带脚本启动：
 
 ```powershell
-mvn -pl admin-shell -am spring-boot:run
+mvn -pl agent-application -am package -DskipTests
+python start-backend.py
 ```
+
+> **不要用 `mvn -pl agent-application -am spring-boot:run`**：`-am` 会把根聚合工程
+> `agent-runner`（`packaging=pom`）一起拉进 reactor，而 CLI 直接触发的 goal 会在**每个**
+> reactor 项目上执行，执行到根工程时必然报
+> `Unable to find a suitable main class`。
+>
+> 若确实想用 `spring-boot:run`，必须先 `install` 到本地仓库，再只对单一模块执行：
+> `mvn -pl agent-application -am install -DskipTests` → `mvn -pl agent-application spring-boot:run`。
+>
+> `start-backend.py` 里带 `--add-opens=java.base/java.nio=org.apache.arrow.memory.core,ALL-UNNAMED`，
+> agent-memory 的 Arrow(OLAP) 存储依赖这个参数才能启动，直接 `java -jar` 时别漏掉。
 
 前端主壳构建：
 
@@ -301,52 +152,16 @@ npm install
 npm run build
 ```
 
-前端插件加载器测试：
+前端开发服务（端口 16600）：
 
 ```powershell
 cd frontend/web-shell
-npm run test:plugin-loader
+npm run dev
 ```
-
-WMS 后端验证：
-
-```powershell
-mvn -pl modules/module-wms/module-wms-core -am test
-mvn -pl modules/module-wms/module-wms-autoconfig -am test
-```
-
-WMS 前端验证：
-
-```powershell
-cd frontend/modules/wms
-npm run test
-npm run build
-```
-
-## 扩展新插件的推荐方式
-
-新增后端插件：
-
-1. 在 `modules/` 下创建业务模块。
-2. 定义 `PluginRegister`。
-3. 在 `*-autoconfig` 中注册插件 Bean。
-4. 通过配置项控制插件启用。
-5. 在 `admin-shell` 中引入对应 autoconfig 依赖。
-
-新增前端插件：
-
-1. 在 `frontend/modules/xxx` 下创建模块。
-2. 导出 `index.js`、`menus.js`、`routes.js`。
-3. 在 `frontend/web-shell/src/plugin-loader/local-modules.js` 中注册模块 key。
-4. 确保后端插件的 `frontendModule` 与前端模块 key 一致。
 
 ## 工程约束
 
-- 共享能力放在 `framework/`。
-- 业务插件放在 `modules/`。
-- 应用组装放在 `admin-shell/`。
-- 前端主能力放在 `frontend/web-shell/`。
-- 前端子平台放在 `frontend/modules/`。
+- 共享能力放在 `framework/`；业务插件放在 `modules/`；应用组装放在 `agent-application/`。
 - 不编辑 `target/`、`dist/` 等生成产物。
 - Markdown 文档默认使用中文。
-- 敏感配置不要扩散到文档、日志、提交信息或聊天回复中。
+- 敏感配置通过环境变量注入，不要扩散到文档、日志、提交信息或聊天回复中。

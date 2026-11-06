@@ -1,8 +1,8 @@
 package com.zimo.framework.ai.memory;
 
 import com.zimo.framework.ai.observ.HitlConfirmSignalMiddleware;
-import com.zimo.module.agentmemory.engine.MemoryScope;
-import com.zimo.module.agentmemory.engine.PlanExperienceWriter;
+import com.zimo.agent.memory.engine.MemoryScope;
+import com.zimo.agent.memory.engine.PlanExperienceWriter;
 import io.agentscope.core.agent.RuntimeContext;
 import java.util.ArrayList;
 import java.util.List;

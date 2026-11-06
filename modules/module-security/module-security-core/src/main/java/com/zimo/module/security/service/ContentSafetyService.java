@@ -1,5 +1,6 @@
 package com.zimo.module.security.service;
 
+import com.zimo.agent.memory.security.AiMemorySensitiveFilter;
 import com.zimo.module.security.entity.SecDangerousApi;
 import com.zimo.module.security.entity.SecSensitiveWord;
 import com.zimo.module.security.mapper.SecDangerousApiMapper;
@@ -33,7 +34,7 @@ public class ContentSafetyService {
 
     private final SecSensitiveWordMapper wordMapper;
     private final SecDangerousApiMapper apiMapper;
-    private final com.zimo.module.agentmemory.security.AiMemorySensitiveFilter piiFilter;
+    private final AiMemorySensitiveFilter piiFilter;
     private final AuthSessionService sessionService;
 
     public ContentSafetyService(SecSensitiveWordMapper wordMapper,
@@ -42,7 +43,7 @@ public class ContentSafetyService {
         this.wordMapper = wordMapper;
         this.apiMapper = apiMapper;
         this.sessionService = sessionService;
-        this.piiFilter = new com.zimo.module.agentmemory.security.AiMemorySensitiveFilter();
+        this.piiFilter = new AiMemorySensitiveFilter();
         initSeeds();
     }
 

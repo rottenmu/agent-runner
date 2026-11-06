@@ -17,6 +17,7 @@ import com.zimo.module.rag.service.RagKbPermissionService;
 import com.zimo.module.rag.service.RagKbService;
 import com.zimo.module.rag.mapper.RagKnowledgeBaseMapper;
 import com.zimo.module.rag.service.RagPipelineService;
+import com.zimo.module.rag.RagPluginRegister;
 import com.zimo.module.rag.RagProperties;
 import com.zimo.module.rag.pipeline.RagReranker;
 import com.zimo.module.rag.mapper.RagRetrieveLogMapper;
@@ -165,5 +166,12 @@ public class RagAutoConfiguration {
             RagRetrieveService retrieveService,
             AiAgentProperties aiAgentProperties) {
         return new RagChatService(retrieveService, aiAgentProperties);
+    }
+
+    /** RAG 插件身份：进入 {@code GET /api/plugins}，并对齐前端 rag 模块。 */
+    @Bean
+    @ConditionalOnMissingBean
+    public RagPluginRegister ragPluginRegister() {
+        return new RagPluginRegister();
     }
 }

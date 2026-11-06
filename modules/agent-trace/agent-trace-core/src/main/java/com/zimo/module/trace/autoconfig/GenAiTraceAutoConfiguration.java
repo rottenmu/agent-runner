@@ -1,5 +1,6 @@
 package com.zimo.module.trace.autoconfig;
 
+import com.zimo.module.trace.TracePluginRegister;
 import com.zimo.module.trace.genai.GenAiSpanExporter;
 import com.zimo.module.trace.genai.GenAiTraceDiagnostics;
 import com.zimo.module.trace.genai.GenAiTraceObserver;
@@ -53,5 +54,17 @@ public class GenAiTraceAutoConfiguration {
                         + "verify actual output via GenAiTraceDiagnostics.health()",
                 observer, exporter.getClass().getSimpleName());
         return observer;
+    }
+
+    /**
+     * 链路观测插件身份：进入 {@code GET /api/plugins}，并对齐前端 {@code agent-trace-ui} 模块。
+     *
+     * <p>注意 {@code pluginId} 是 {@code agent-trace-ui} 而非 {@code agenttrace} ——
+     * 与前端模块 key 必须逐字一致，否则只会得到一条 loader 提示、页面空白。</p>
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public TracePluginRegister tracePluginRegister() {
+        return new TracePluginRegister();
     }
 }

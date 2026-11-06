@@ -108,7 +108,9 @@ agent_runner/
 
 - 后端完整验证：`mvn clean verify`
 - 后端主应用打包：`mvn -pl agent-application -am package`
-- 后端本地运行：`mvn -pl agent-application -am spring-boot:run`
+- 后端本地运行：先 `mvn -pl agent-application -am package -DskipTests`，再 `python start-backend.py`
+  （**不要**用 `mvn -pl agent-application -am spring-boot:run`：`-am` 会把 `packaging=pom` 的根聚合
+  工程拉进 reactor，CLI goal 在每个 reactor 项目上执行，到根工程必报 `Unable to find a suitable main class`）
 - 前端主壳构建：
   - `cd frontend/web-shell && npm install && npm run build`
 - 前端开发服务：

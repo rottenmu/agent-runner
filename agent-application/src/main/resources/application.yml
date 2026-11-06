@@ -1,6 +1,12 @@
 server:
   port: 9900
 
+app:
+  cors:
+    # CORS 跨域来源白名单（逗号分隔）。不再使用通配符 "*"。
+    # 生产环境请改为真实前端域名；留空则 CORS 不放行任何跨域来源。
+    allowed-origins: "http://localhost:16600,http://127.0.0.1:16600,http://localhost:18000,http://127.0.0.1:18000"
+
 spring:
   datasource:
     url: jdbc:sqlite:./data/agent_runner.db

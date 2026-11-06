@@ -2,8 +2,8 @@ package com.zimo.framework.ai.memory;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.zimo.module.agentmemory.engine.MemoryScope;
-import com.zimo.module.agentmemory.engine.PlanExperienceWriter;
+import com.zimo.agent.memory.engine.MemoryScope;
+import com.zimo.agent.memory.engine.PlanExperienceWriter;
 import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.event.ConfirmResult;
 import io.agentscope.core.event.UserConfirmResultEvent;

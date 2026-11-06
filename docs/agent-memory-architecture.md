@@ -183,6 +183,27 @@ flowchart TB
 - **冲突声明是硬约束**：片段首行必须是「仅供参考，若与用户当前陈述冲突，以用户当前陈述为准」。否则用户改了偏好仍被反复按旧偏好处理且无法理解为何改不掉。
 - **入系统提示词，不插 messages**：早期版本自己构造 SYSTEM 消息插进 messages，被 AgentScope 拒绝（`Hooks must not inject SYSTEM messages into PreCallEvent.inputMessages`），表现为每条命中记忆的对话都失败。
 
+### 5.1.1 L3 用户画像注入（跨会话稳定层）
+
+L1 是「每轮召回的变动内容」，L3 是「多轮不变的稳定画像」。两者共用同一个注入点（中间件的 `onSystemPrompt`），但**数据来源、生命周期、降级路径都独立**。
+
+```mermaid
+flowchart TB
+    M["MemoryPromptMiddleware.onSystemPrompt（每轮首次调用）"] --> P["PersonaFragmentComposer.compose(scope, traceId)"]
+    P --> P1["按 persona.types 逐类 getPersona\n(persona → preference → habit)"]
+    P1 --> P2["内容单行化 + 去重\n(同一句可能同时落在两个类别)"]
+    P2 --> P3["拼接标题 + 冲突声明\n超 maxChars 显式截断"]
+    P3 --> P4["写 L0 留痕 (meta: layer=L3)"]
+    M --> L["MemoryAwarePromptBuilder.recallFragment（L1）"]
+    L --> C["augment: 系统提示词 + 画像 + 召回片段"]
+```
+
+- **稳定内容必须排在变动内容之前**：这是「多轮不变 → 前缀可缓存」的前提。若画像排在 L1 片段之后，L1 一变连画像一起掉出缓存前缀，缓存收益归零。当前可复用前缀 = `系统提示词 + 画像`。
+- **`history` 刻意不注入**：那是「某次任务做到哪一步」的流水，属于 L2 场景范畴。放进稳定画像会让模型每轮都拖着已完成任务的残影。
+- **两类失败必须分开 try/catch**：合并后画像查库失败会连带丢掉已召回成功的 L1 片段（表现为「画像查不到，偏好也不注入了」）。
+- **配置**：`agent-memory.persona.enabled`（默认 true，可单独止血，不影响 L1）/ `.types`（默认 `persona,preference,habit`）/ `.max-chars`（默认 2000）。
+- **`instruction` 不单列类别**：`FactExtractor` 的 `preference_directive` 模式本身就同时承载「偏好」与「长期指令」（`以后都用 / 不要用 / 一律 / 请用` 与 `我喜欢 / 我偏好` 同规则）。拆成新类别要同步改 MCP 工具枚举、治理 UI 分类与存量数据，收益不足以抵掉这层扩散。
+
 ### 5.2 异步回写队列
 
 ```mermaid
@@ -216,7 +237,8 @@ flowchart LR
     SUM --> OUT["0~1 综合分\n(三项均已归一化)"]
 ```
 
-- **默认权重** `match 0.5 / decay 0.3 / importance 0.2`；半衰期 30 天；topK 8；注入阈值 0.25。
+- **默认权重** `match 0.5 / decay 0.3 / importance 0.2`；半衰期 30 天；topK **5**；注入阈值 0.25。
+- **topK 为什么是 5 而不是 8**：这 5 条会被逐条渲染成文本塞进系统提示词，条数直接乘上 token 成本且每轮都付一次。8 条在混合类别召回时经常出现「末尾两三条只是近似命中」的填充项，注入它们只会稀释前几条的信号。需要更多时按部署显式调 `agent-memory.recall.top-k`。
 - **`match` 而非 `similarity`**：用字符级 2-gram 覆盖率，不是语义相似度。中文无空格分词，单字命中会被「的/了/是」高频虚词主导；bigram 对虚词贡献天然更小，且零依赖、可离线回归。**命名诚实是这套方案能被信任的前提**。
 - **纯函数 + 可回归**：`MemoryScorer` 不持可变状态、不做 IO、不读时钟（`now` 由调用方传入）。同一输入必然逐位相同 —— 这是「分数可回归」验收标准成立的基础。
 - **Δt 量化到整小时**：否则 `now` 的毫秒抖动会让同一条目两次召回分数在第 10 位小数漂移，使「连续 3 次逐位相同」永不成立。量化代价可忽略（半衰期 30 天，一小时衰减误差 ≈ 0.096%）。

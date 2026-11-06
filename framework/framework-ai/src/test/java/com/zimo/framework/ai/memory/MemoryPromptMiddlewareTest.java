@@ -1,7 +1,7 @@
 package com.zimo.framework.ai.memory;
 
-import com.zimo.module.agentmemory.engine.MemoryAwarePromptBuilder;
-import com.zimo.module.agentmemory.engine.MemoryScope;
+import com.zimo.agent.memory.engine.MemoryAwarePromptBuilder;
+import com.zimo.agent.memory.engine.MemoryScope;
 import com.zimo.framework.ai.observ.HarnessTraceMiddleware;
 import io.agentscope.core.agent.RuntimeContext;
 import java.util.ArrayList;
@@ -149,6 +149,36 @@ class MemoryPromptMiddlewareTest {
         assertEquals("片段", context.get(MemoryPromptMiddleware.CTX_FRAGMENT, String.class));
     }
 
+    @Test
+    @DisplayName("L3 画像排在 L1 召回片段之前（稳定内容在前，前缀才可缓存）")
+    void stablePersonaComesBeforeVolatileFragment() {
+        StubBuilder builder = new StubBuilder("## 已知的用户长期记忆\n- [custom|0.90] 偏好邮件汇报")
+                .withPersona("## 用户画像（跨会话稳定记忆）\n- [persona] 我是李雷");
+        MemoryPromptMiddleware middleware = new MemoryPromptMiddleware(builder);
+        RuntimeContext context = context(MemoryScope.of("t1", "u1", "s1"), "怎么汇报", TRACE);
+
+        String result = middleware.onSystemPrompt(null, context, "你是一个助手").block();
+
+        assertTrue(result.startsWith("你是一个助手"), "原系统提示词必须逐字保留，实际：" + result);
+        assertTrue(result.indexOf("## 用户画像") < result.indexOf("## 已知的用户长期记忆"),
+                "画像必须是「多轮不变」的那一段，放在召回片段之后会让它一起掉出缓存前缀，实际：" + result);
+    }
+
+    @Test
+    @DisplayName("画像每轮只读一次，且与召回片段的缓存互不影响")
+    void personaReadsOnlyOncePerTurn() {
+        StubBuilder builder = new StubBuilder((String) null).withPersona("## 用户画像\n- [persona] 我是李雷");
+        MemoryPromptMiddleware middleware = new MemoryPromptMiddleware(builder);
+        RuntimeContext context = context(MemoryScope.of("t1", "u1", "s1"), "怎么汇报", TRACE);
+
+        String first = middleware.onSystemPrompt(null, context, "提示词").block();
+        String second = middleware.onSystemPrompt(null, context, "提示词").block();
+
+        assertEquals(1, builder.personaCalls(), "画像每轮只该读一次（同一轮内推理循环会多次调用本方法）");
+        assertEquals(first, second);
+        assertTrue(first.contains("我是李雷"), "没有召回片段时画像仍必须注入，实际：" + first);
+    }
+
     /** 造一个已绑定 scope/query/traceId 的运行时上下文（复现 AiAgentService 的绑定顺序）。 */
     private static RuntimeContext context(MemoryScope scope, String query, String traceId) {
         RuntimeContext context = RuntimeContext.empty();
@@ -163,9 +193,12 @@ class MemoryPromptMiddlewareTest {
         private final String fragment;
         private final RuntimeException failure;
         private final AtomicInteger calls = new AtomicInteger();
+        private final AtomicInteger personaCalls = new AtomicInteger();
         private final List<MemoryScope> seenScopes = new ArrayList<>();
         private final List<String> seenQueries = new ArrayList<>();
         private final List<String> seenTraceIds = new ArrayList<>();
+        /** L3 画像桩内容：默认 null（= 本轮无画像），由 {@link #withPersona} 设置。 */
+        private String personaText;
 
         StubBuilder(String fragment) {
             this(fragment, null);
@@ -181,6 +214,12 @@ class MemoryPromptMiddlewareTest {
             this.failure = failure;
         }
 
+        /** 给桩补一段 L3 画像内容（链式，避免再加构造重载把 4 个组合铺开）。 */
+        StubBuilder withPersona(String persona) {
+            this.personaText = persona;
+            return this;
+        }
+
         @Override
         public String recallFragment(MemoryScope scope, String query, String traceId) {
             calls.incrementAndGet();
@@ -193,8 +232,18 @@ class MemoryPromptMiddlewareTest {
             return fragment;
         }
 
+        @Override
+        public String personaFragment(MemoryScope scope, String traceId) {
+            personaCalls.incrementAndGet();
+            return personaText;
+        }
+
         int calls() {
             return calls.get();
+        }
+
+        int personaCalls() {
+            return personaCalls.get();
         }
     }
 }

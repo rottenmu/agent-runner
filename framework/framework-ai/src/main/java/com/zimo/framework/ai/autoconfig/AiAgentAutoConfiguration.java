@@ -1,5 +1,10 @@
 package com.zimo.framework.ai.autoconfig;
 
+import com.zimo.agent.memory.engine.MemoryAwarePromptBuilder;
+import com.zimo.agent.memory.engine.MemoryTraceSink;
+import com.zimo.agent.memory.engine.PlanExperienceWriter;
+import com.zimo.agent.memory.governance.MemoryManager;
+import com.zimo.agent.memory.storage.OltpMemoryRepository;
 import com.zimo.framework.common.storage.FileStorageService;
 import com.zimo.framework.ai.AiAgentProperties;
 import com.zimo.framework.ai.AiAgentService;
@@ -17,7 +22,7 @@ import com.zimo.framework.ai.channel.AiChannelHandler;
 import com.zimo.framework.ai.channel.AiChannelIntentHandler;
 import com.zimo.framework.ai.chat.AiChatClient;
 import com.zimo.framework.ai.chat.OpenAiCompatibleChatClient;
-import com.zimo.module.agentmemory.memory.AiMemoryService;
+import com.zimo.agent.memory.memory.AiMemoryService;
 import com.zimo.framework.ai.runtime.AiAgentRuntime;
 import com.zimo.framework.ai.runtime.AiAgentRuntimeFactory;
 import com.zimo.framework.common.skill.AiSkill;
@@ -27,7 +32,6 @@ import com.zimo.framework.ai.skill.ToolApprovalHandler;
 import com.zimo.framework.ai.skill.ToolGuard;
 import com.zimo.framework.ai.skill.ToolHook;
 import com.zimo.framework.ai.skill.ToolPipeline;
-import com.zimo.framework.ai.preset.AiAgentPreset;
 import com.zimo.framework.ai.preset.AiAgentPresetRegistry;
 import java.util.List;
 import org.springframework.beans.factory.ObjectProvider;
@@ -267,7 +271,7 @@ public class AiAgentAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean
     public com.zimo.framework.ai.memory.MemoryPromptMiddleware memoryPromptMiddleware(
-            org.springframework.beans.factory.ObjectProvider<com.zimo.module.agentmemory.engine.MemoryAwarePromptBuilder> promptBuilderProvider) {
+            org.springframework.beans.factory.ObjectProvider<MemoryAwarePromptBuilder> promptBuilderProvider) {
         return new com.zimo.framework.ai.memory.MemoryPromptMiddleware(
                 promptBuilderProvider.getIfAvailable());
     }
@@ -318,7 +322,7 @@ public class AiAgentAutoConfiguration {
      */
     @Bean
     @ConditionalOnMissingBean
-    public com.zimo.module.agentmemory.engine.MemoryTraceSink memoryTraceSink() {
+    public MemoryTraceSink memoryTraceSink() {
         return com.zimo.framework.ai.observ.TraceCollector::stepFor;
     }
 
@@ -453,12 +457,12 @@ public class AiAgentAutoConfiguration {
             AiHarnessAgentRegistry registry,
             AiHarnessSessionKeyFactory sessionKeyFactory,
             org.springframework.beans.factory.ObjectProvider<com.zimo.framework.common.storage.FileStorageService> fileStorageProvider,
-            org.springframework.beans.factory.ObjectProvider<com.zimo.module.agentmemory.storage.OltpMemoryRepository> oltpProvider,
+            org.springframework.beans.factory.ObjectProvider<OltpMemoryRepository> oltpProvider,
             org.springframework.beans.factory.ObjectProvider<com.zimo.framework.common.ai.event.AiEventPublisher> eventPublisherProvider,
             java.util.List<com.zimo.framework.ai.agent.AiRequestInterceptor> requestInterceptors,
             java.util.List<com.zimo.framework.ai.agent.AiAgentMiddleware> middlewares,
             org.springframework.beans.factory.ObjectProvider<com.zimo.framework.ai.plugin.DynamicPluginManager> pluginManagerProvider,
-            org.springframework.beans.factory.ObjectProvider<com.zimo.module.agentmemory.engine.MemoryAwarePromptBuilder> memoryPromptProvider,
+            org.springframework.beans.factory.ObjectProvider<MemoryAwarePromptBuilder> memoryPromptProvider,
             org.springframework.beans.factory.ObjectProvider<com.zimo.framework.ai.memory.PlanWritebackCoordinator> planWritebackProvider) {
         List<com.zimo.framework.ai.agent.AiAgentMiddleware> allMiddlewares =
                 new java.util.ArrayList<>(middlewares == null ? List.of() : middlewares);
@@ -498,14 +502,14 @@ public class AiAgentAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean
     public com.zimo.framework.ai.memory.PlanWritebackCoordinator planWritebackCoordinator(
-            org.springframework.beans.factory.ObjectProvider<com.zimo.module.agentmemory.governance.MemoryManager> memoryManagerProvider) {
-        com.zimo.module.agentmemory.governance.MemoryManager memoryManager =
+            org.springframework.beans.factory.ObjectProvider<MemoryManager> memoryManagerProvider) {
+        MemoryManager memoryManager =
                 memoryManagerProvider.getIfAvailable();
         if (memoryManager == null) {
             return null;
         }
         return new com.zimo.framework.ai.memory.PlanWritebackCoordinator(
-                new com.zimo.module.agentmemory.engine.PlanExperienceWriter(memoryManager),
+                new PlanExperienceWriter(memoryManager),
                 com.zimo.framework.ai.observ.TraceCollector::planStepsOf);
     }
 

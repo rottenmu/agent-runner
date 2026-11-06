@@ -500,7 +500,7 @@ trajectoryRecorder.record(sessionId, null, traceId, "user",
 
 - `framework/framework-ai/pom.xml` 声明依赖 `agent-memory-core`；
 - `framework/framework-ai/.../AiAgentService.java` 直接
-  `import com.zimo.module.agentmemory.chat.AiConversationMemory;` 并在第 120 行 `new` 出来。
+  `import chat.com.zimo.agent.memory.AiConversationMemory;` 并在第 120 行 `new` 出来。
 
 与 `AGENTS.md`「共享能力放 `framework/`、业务插件放 `modules/`」的**依赖方向相反**：
 框架层无法脱离该业务模块单独使用，业务模块的演进会反向牵动框架。

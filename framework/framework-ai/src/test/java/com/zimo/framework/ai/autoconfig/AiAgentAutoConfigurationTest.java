@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.zimo.framework.ai.AiAgentProperties;
 import com.zimo.framework.ai.AiAgentService;
 import com.zimo.framework.ai.agent.AiHarnessAgentFactory;
-import com.zimo.module.agentmemory.memory.AiMemoryService;
+import com.zimo.agent.memory.memory.AiMemoryService;
 import com.zimo.framework.ai.channel.AiChannelHandler;
 import com.zimo.framework.ai.chat.AiChatClient;
 import com.zimo.framework.ai.chat.AiChatResponse;

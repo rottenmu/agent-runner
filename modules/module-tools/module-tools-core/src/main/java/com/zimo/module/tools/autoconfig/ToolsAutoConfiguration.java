@@ -12,6 +12,7 @@ import com.zimo.module.tools.mapper.ToolPluginMapper;
 import com.zimo.module.tools.service.ToolPluginService;
 import com.zimo.module.tools.mapper.ToolPythonScriptMapper;
 import com.zimo.module.tools.service.ToolScriptService;
+import com.zimo.module.tools.ToolsPluginRegister;
 import com.zimo.module.tools.ToolsProperties;
 import com.zimo.module.tools.govern.ToolGovernanceService;
 import com.zimo.module.tools.govern.ToolGovernor;
@@ -193,6 +194,13 @@ public class ToolsAutoConfiguration {
     @ConditionalOnMissingBean
     public CodeTool codeTool(ToolsProperties properties, SandboxBackend sandboxBackend) {
         return new CodeTool(properties, sandboxBackend);
+    }
+
+    /** 工具中心插件身份：进入 {@code GET /api/plugins}，并对齐前端 tools 模块。 */
+    @Bean
+    @ConditionalOnMissingBean
+    public ToolsPluginRegister toolsPluginRegister() {
+        return new ToolsPluginRegister();
     }
 
     /** 初始化器：挂载 SDK + 播种插件 + 恢复启用工具。 */

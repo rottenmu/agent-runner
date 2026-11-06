@@ -3,6 +3,9 @@
 - 日期：2026-08-29
 - 状态：待审核
 - 来源：将 `frontend/modules/agentmemory`（web-shell 前端插件）改造成**可独立运行的 Vue3 应用**
+- 📌 路径变更（2026-11-06）：下方第二节的 `frontend/agent-memory-ui/` 已整体移至
+  `modules/agent-memory/frontend/agent-memory-ui/`，工程内容、6060 端口与 proxy 语义不变。
+  见 `docs/plans/2026-11-06-agent-memory-inrepo-runnable.md`。本文为历史方案，正文保留原样。
 
 ## 一、目标
 

@@ -3,9 +3,9 @@ package com.zimo.framework.ai.chat;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.groups.Tuple.tuple;
 
-import com.zimo.module.agentmemory.chat.AiConversationMemory;
-import com.zimo.module.agentmemory.chat.AiChatMessage;
-import com.zimo.module.agentmemory.chat.AiConversationCompressionCandidate;
+import com.zimo.agent.memory.chat.AiConversationMemory;
+import com.zimo.agent.memory.chat.AiChatMessage;
+import com.zimo.agent.memory.chat.AiConversationCompressionCandidate;
 
 import com.zimo.framework.ai.AiAgentProperties;
 import java.util.ArrayList;

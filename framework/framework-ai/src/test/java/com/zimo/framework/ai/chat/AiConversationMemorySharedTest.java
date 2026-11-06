@@ -1,14 +1,13 @@
 package com.zimo.framework.ai.chat;
 
-import com.zimo.module.agentmemory.chat.AiConversationMemory;
-import com.zimo.module.agentmemory.chat.AiChatMessage;
-import com.zimo.module.agentmemory.chat.AiConversationCompressionCandidate;
+import com.zimo.agent.memory.chat.AiConversationMemory;
+import com.zimo.agent.memory.chat.AiChatMessage;
+import com.zimo.agent.memory.chat.AiConversationCompressionCandidate;
 
-import com.zimo.module.agentmemory.chat.AiConversationCompressionCandidate;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.zimo.framework.common.storage.FileStorageService;
-import java.util.ArrayList;
+
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;

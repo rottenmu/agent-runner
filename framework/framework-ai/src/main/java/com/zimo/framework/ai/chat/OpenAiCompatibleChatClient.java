@@ -1,6 +1,6 @@
 package com.zimo.framework.ai.chat;
 
-import com.zimo.module.agentmemory.chat.AiChatMessage;
+import com.zimo.agent.memory.chat.AiChatMessage;
 import com.zimo.framework.ai.AiAgentProperties;
 import cn.hutool.core.util.StrUtil;
 import java.util.ArrayList;

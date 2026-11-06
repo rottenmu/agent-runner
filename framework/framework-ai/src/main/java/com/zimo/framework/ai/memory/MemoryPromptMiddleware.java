@@ -1,7 +1,7 @@
 package com.zimo.framework.ai.memory;
 
-import com.zimo.module.agentmemory.engine.MemoryAwarePromptBuilder;
-import com.zimo.module.agentmemory.engine.MemoryScope;
+import com.zimo.agent.memory.engine.MemoryAwarePromptBuilder;
+import com.zimo.agent.memory.engine.MemoryScope;
 import io.agentscope.core.agent.Agent;
 import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.middleware.MiddlewareBase;
@@ -48,6 +48,8 @@ public class MemoryPromptMiddleware implements MiddlewareBase {
     public static final String CTX_QUERY = "zimo.memory.query";
     /** RuntimeContext 键：本轮片段缓存（空串表示「本轮确认无片段」）。 */
     public static final String CTX_FRAGMENT = "zimo.memory.fragment";
+    /** RuntimeContext 键：本轮 L3 画像缓存（空串表示「本轮确认无画像」）。 */
+    public static final String CTX_PERSONA = "zimo.memory.persona";
 
     private final MemoryAwarePromptBuilder builder;
 
@@ -82,9 +84,16 @@ public class MemoryPromptMiddleware implements MiddlewareBase {
     }
 
     /**
-     * 把本轮记忆片段追加到系统提示词末尾。
+     * 把本轮记忆片段追加到系统提示词末尾（L3 稳定画像在前，L1 召回片段在后）。
      *
-     * <p>任何异常都不向外抛 —— 记忆是增强能力，召回或留痕失败都不允许影响对话本身。</p>
+     * <h2>为什么稳定内容必须排在变动内容之前</h2>
+     * <p>L3 画像（{@code ## 用户画像}）是<b>多轮不变</b>的，L1 召回片段每轮都可能变。
+     * 若把画像放在最后，前面的 L1 片段一变，<b>连画像一起落在缓存前缀之外</b>，
+     * 「多轮不变 → 前缀可缓存」这个前提就整体失效了。当前顺序下可复用的前缀是
+     * {@code 系统提示词 + 画像}，只有尾部随召回变化。</p>
+     *
+     * <p>任何异常都不向外抛。L1 与 L3 <b>分别 try/catch</b> —— 合在一起会让画像读取失败
+     * 连带丢掉召回成功的那部分内容。</p>
      *
      * @param agent        当前智能体
      * @param context      运行时上下文
@@ -97,19 +106,49 @@ public class MemoryPromptMiddleware implements MiddlewareBase {
             return Mono.just(systemPrompt);
         }
         try {
-            String cached = context.get(CTX_FRAGMENT, String.class);
-            if (cached != null) {
-                return Mono.just(augment(systemPrompt, cached));
+            String cachedFragment = context.get(CTX_FRAGMENT, String.class);
+            String cachedPersona = context.get(CTX_PERSONA, String.class);
+            if (cachedFragment != null && cachedPersona != null) {
+                return Mono.just(augment(systemPrompt, cachedPersona, cachedFragment));
             }
             MemoryScope scope = context.get(CTX_SCOPE, MemoryScope.class);
             String query = context.get(CTX_QUERY, String.class);
-            String fragment = builder.recallFragment(scope, query, traceIdOf(context));
-            // 缓存「本轮无片段」的结论：空串是有意义的负结果，不能与「还没算」混为一谈
-            context.put(CTX_FRAGMENT, fragment == null ? "" : fragment);
-            return Mono.just(augment(systemPrompt, fragment));
+            String traceId = traceIdOf(context);
+            String persona = cachedPersona != null
+                    ? cachedPersona : safePersona(scope, traceId);
+            if (cachedPersona == null) {
+                context.put(CTX_PERSONA, persona);
+            }
+            String fragment = cachedFragment != null
+                    ? cachedFragment : safeRecall(scope, query, traceId);
+            if (cachedFragment == null) {
+                // 缓存「本轮无片段」的结论：空串是有意义的负结果，不能与「还没算」混为一谈
+                context.put(CTX_FRAGMENT, fragment);
+            }
+            return Mono.just(augment(systemPrompt, persona, fragment));
         } catch (RuntimeException e) {
             // 不抛：记忆注入失败必须降级为「本轮没有记忆」，而不是让整轮对话失败
             return Mono.just(systemPrompt);
+        }
+    }
+
+    /** L3 画像读取：失败降级为空串（= 本轮无画像），不影响 L1。 */
+    private String safePersona(MemoryScope scope, String traceId) {
+        try {
+            String persona = builder.personaFragment(scope, traceId);
+            return persona == null ? "" : persona;
+        } catch (RuntimeException e) {
+            return "";
+        }
+    }
+
+    /** L1 召回：失败降级为空串（= 本轮无片段），不影响 L3。 */
+    private String safeRecall(MemoryScope scope, String query, String traceId) {
+        try {
+            String fragment = builder.recallFragment(scope, query, traceId);
+            return fragment == null ? "" : fragment;
+        } catch (RuntimeException e) {
+            return "";
         }
     }
 
@@ -119,14 +158,25 @@ public class MemoryPromptMiddleware implements MiddlewareBase {
                 String.class);
     }
 
-    /** 拼接片段：系统提示词为空时不产生前导空行。 */
-    private static String augment(String systemPrompt, String fragment) {
-        if (fragment == null || fragment.isEmpty()) {
+    /**
+     * 拼接片段：稳定画像在前、召回片段在后；系统提示词为空时不产生前导空行。
+     *
+     * @param systemPrompt 原系统提示词
+     * @param persona      L3 画像片段（空串表示无）
+     * @param fragment     L1 召回片段（空串表示无）
+     * @return 拼接结果；两段都为空时原样返回
+     */
+    private static String augment(String systemPrompt, String persona, String fragment) {
+        String stable = persona == null ? "" : persona;
+        String dynamic = fragment == null ? "" : fragment;
+        if (stable.isEmpty() && dynamic.isEmpty()) {
             return systemPrompt;
         }
+        String body = stable.isEmpty() ? dynamic
+                : (dynamic.isEmpty() ? stable : stable + "\n\n" + dynamic);
         if (systemPrompt == null || systemPrompt.isBlank()) {
-            return fragment;
+            return body;
         }
-        return systemPrompt + "\n\n" + fragment;
+        return systemPrompt + "\n\n" + body;
     }
 }

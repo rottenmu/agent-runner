@@ -2,7 +2,7 @@ package com.zimo.framework.ai;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.zimo.module.agentmemory.chat.AiChatMessage;
+import com.zimo.agent.memory.chat.AiChatMessage;
 import com.zimo.framework.ai.agent.AiHarnessAgentFactory;
 import com.zimo.framework.ai.agent.AiHarnessAgentRegistry;
 import com.zimo.framework.ai.agent.AiHarnessAgentRouter;

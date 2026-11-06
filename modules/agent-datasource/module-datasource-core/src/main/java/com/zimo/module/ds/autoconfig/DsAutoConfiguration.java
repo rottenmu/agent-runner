@@ -1,6 +1,7 @@
 package com.zimo.module.ds.autoconfig;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.zimo.module.ds.DsPluginRegister;
 import com.zimo.module.ds.connector.DsConnectorFactory;
 import com.zimo.module.ds.mapper.DsDataSourceMapper;
 import com.zimo.module.ds.service.DsDataSourceService;
@@ -42,5 +43,12 @@ public class DsAutoConfiguration {
     @ConditionalOnMissingBean
     public DsQuerySkill dsQuerySkill(DsDataSourceService service) {
         return new DsQuerySkill(service);
+    }
+
+    /** 数据源插件身份：进入 {@code GET /api/plugins}，并对齐前端 datasource 模块。 */
+    @Bean
+    @ConditionalOnMissingBean
+    public DsPluginRegister dsPluginRegister() {
+        return new DsPluginRegister();
     }
 }
